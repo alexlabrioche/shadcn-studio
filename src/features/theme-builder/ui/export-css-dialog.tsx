@@ -38,7 +38,7 @@ export function ExportCssDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>Export CSS</Button>
+        <Button variant="outline">Export CSS</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>

@@ -1,7 +1,6 @@
 import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -10,11 +9,20 @@ import {
   getCustomThemeColorPairs,
   updateThemeColorPair,
 } from '@/features/theme-builder/model/theme'
-import type { MainTheme, ThemeColorPair } from '@/features/theme-builder/model/theme'
+import type {
+  AppAppearance,
+  MainTheme,
+  ThemeColorPair,
+  ThemeMode,
+} from '@/features/theme-builder/model/theme'
 import { ColorField } from '@/features/theme-builder/ui/color-field'
 
 interface ThemeDesignerPanelProps {
   theme: MainTheme
+  mode: ThemeMode
+  appAppearance: AppAppearance
+  onModeChange: (mode: ThemeMode) => void
+  onAppAppearanceChange: (appAppearance: AppAppearance) => void
   onThemeChange: (updater: (previous: MainTheme) => MainTheme) => void
 }
 
@@ -51,7 +59,7 @@ function ColorPairEditor({
           </label>
         ) : null}
       </div>
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="flex flex-col gap-2">
         <ColorField
           label={pair.name}
           value={pair.color}
@@ -71,6 +79,10 @@ function ColorPairEditor({
 
 export function ThemeDesignerPanel({
   theme,
+  mode,
+  appAppearance,
+  onModeChange,
+  onAppAppearanceChange,
   onThemeChange,
 }: ThemeDesignerPanelProps) {
   const [newPairName, setNewPairName] = React.useState('')
@@ -78,8 +90,14 @@ export function ThemeDesignerPanel({
     React.useState(false)
   const [addPairError, setAddPairError] = React.useState<string | null>(null)
 
-  const builtInPairs = React.useMemo(() => getBuiltInThemeColorPairs(theme), [theme])
-  const customPairs = React.useMemo(() => getCustomThemeColorPairs(theme), [theme])
+  const builtInPairs = React.useMemo(
+    () => getBuiltInThemeColorPairs(theme, mode),
+    [mode, theme],
+  )
+  const customPairs = React.useMemo(
+    () => getCustomThemeColorPairs(theme, mode),
+    [mode, theme],
+  )
 
   const handleAddPair = React.useCallback(() => {
     const result = addCustomThemeColorPair(theme, {
@@ -99,11 +117,44 @@ export function ThemeDesignerPanel({
   }, [includeInButtonVariant, newPairName, onThemeChange, theme])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Theme Designer</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4 p-4">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">Theme Designer</h2>
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Dark mode</span>
+            <Switch
+              checked={appAppearance === 'dark'}
+              onCheckedChange={(checked) =>
+                onAppAppearanceChange(checked ? 'dark' : 'light')
+              }
+              aria-label="Toggle app dark mode"
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs">Editing tokens</span>
+          <div className="inline-flex items-center gap-1 rounded-md border p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === 'light' ? 'secondary' : 'ghost'}
+              onClick={() => onModeChange('light')}
+            >
+              Light
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === 'dark' ? 'secondary' : 'ghost'}
+              onClick={() => onModeChange('dark')}
+            >
+              Dark
+            </Button>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4">
         <section className="space-y-2">
           <p className="text-sm font-medium">Semantic Color Pairs</p>
           <p className="text-muted-foreground text-xs">
@@ -118,12 +169,12 @@ export function ThemeDesignerPanel({
                 pair={pair}
                 onColorChange={(value) =>
                   onThemeChange((previous) =>
-                    updateThemeColorPair(previous, pair.name, { color: value }),
+                    updateThemeColorPair(previous, mode, pair.name, { color: value }),
                   )
                 }
                 onForegroundChange={(value) =>
                   onThemeChange((previous) =>
-                    updateThemeColorPair(previous, pair.name, {
+                    updateThemeColorPair(previous, mode, pair.name, {
                       foreground: value,
                     }),
                   )
@@ -183,21 +234,21 @@ export function ThemeDesignerPanel({
                   pair={pair}
                   onColorChange={(value) =>
                     onThemeChange((previous) =>
-                      updateThemeColorPair(previous, pair.name, {
+                      updateThemeColorPair(previous, mode, pair.name, {
                         color: value,
                       }),
                     )
                   }
                   onForegroundChange={(value) =>
                     onThemeChange((previous) =>
-                      updateThemeColorPair(previous, pair.name, {
+                      updateThemeColorPair(previous, mode, pair.name, {
                         foreground: value,
                       }),
                     )
                   }
                   onIncludeInButtonVariantChange={(checked) =>
                     onThemeChange((previous) =>
-                      updateThemeColorPair(previous, pair.name, {
+                      updateThemeColorPair(previous, mode, pair.name, {
                         includeInButtonVariant: checked,
                       }),
                     )
@@ -207,7 +258,7 @@ export function ThemeDesignerPanel({
             </div>
           ) : null}
         </section>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -2,8 +2,15 @@ import * as React from 'react'
 import { Colorful } from '@uiw/react-color'
 
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { normalizeThemeColor, toHexColor } from '@/features/theme-builder/model/theme'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  normalizeThemeColor,
+  toHexColor,
+} from '@/features/theme-builder/model/theme'
 import type { ThemeColor } from '@/features/theme-builder/model/theme'
 
 interface ColorFieldProps {
@@ -55,7 +62,7 @@ export function ColorField({
             >
               <span
                 aria-hidden="true"
-                className="h-6 w-10 rounded-sm border border-zinc-300"
+                className="h-6 w-10 rounded-sm border border-border"
                 style={{ backgroundColor: pickerColor }}
               />
               <span>Choose</span>

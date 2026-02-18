@@ -7,7 +7,7 @@ function IndexRedirect() {
   const navigate = useNavigate()
 
   React.useEffect(() => {
-    navigate({ to: '/mvp-preview', replace: true })
+    navigate({ to: '/theme-builder', replace: true })
   }, [navigate])
 
   return null

@@ -1,4 +1,4 @@
-import { LayoutTemplateIcon, PaletteIcon } from 'lucide-react'
+import { PaletteIcon } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 
 import { Badge } from '@/components/ui/badge'
@@ -15,13 +15,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
-import type { ThemeBuilderView } from '@/features/theme-builder/ui/theme-builder-page'
+import { Switch } from '@/components/ui/switch'
+import type { AppAppearance } from '@/features/theme-builder/model/theme'
 
 interface ThemeBuilderSidebarProps {
-  activeView: ThemeBuilderView
+  appAppearance: AppAppearance
+  onAppAppearanceChange: (appAppearance: AppAppearance) => void
 }
 
-export function ThemeBuilderSidebar({ activeView }: ThemeBuilderSidebarProps) {
+export function ThemeBuilderSidebar({
+  appAppearance,
+  onAppAppearanceChange,
+}: ThemeBuilderSidebarProps) {
   return (
     <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader>
@@ -52,26 +57,10 @@ export function ThemeBuilderSidebar({ activeView }: ThemeBuilderSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeView === 'mvp-preview'}
-                  tooltip="MVP Preview"
-                >
-                  <Link to="/mvp-preview">
-                    <LayoutTemplateIcon />
-                    <span>MVP Preview</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeView === 'theme-designer'}
-                  tooltip="Theme Designer"
-                >
-                  <Link to="/theme-designer">
+                <SidebarMenuButton asChild tooltip="Theme Builder">
+                  <Link to="/theme-builder">
                     <PaletteIcon />
-                    <span>Theme Designer</span>
+                    <span>Theme Builder</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -81,6 +70,16 @@ export function ThemeBuilderSidebar({ activeView }: ThemeBuilderSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        <label className="flex items-center justify-between gap-2 px-2 text-xs group-data-[collapsible=icon]:hidden">
+          <span className="text-sidebar-foreground/70">Dark mode</span>
+          <Switch
+            checked={appAppearance === 'dark'}
+            onCheckedChange={(checked) =>
+              onAppAppearanceChange(checked ? 'dark' : 'light')
+            }
+            aria-label="Toggle app dark mode"
+          />
+        </label>
         <p className="text-sidebar-foreground/70 px-2 text-xs group-data-[collapsible=icon]:hidden">
           Cmd/Ctrl + B toggles sidebar
         </p>

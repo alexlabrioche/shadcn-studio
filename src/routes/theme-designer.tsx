@@ -1,10 +1,16 @@
-import { ThemeBuilderScreen } from '@/features/theme-builder'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import * as React from 'react'
 
 export const Route = createFileRoute('/theme-designer')({
-  component: ThemeDesignerRoute,
+  component: ThemeDesignerRedirect,
 })
 
-function ThemeDesignerRoute() {
-  return <ThemeBuilderScreen activeView="theme-designer" />
+function ThemeDesignerRedirect() {
+  const navigate = useNavigate()
+
+  React.useEffect(() => {
+    navigate({ to: '/theme-builder', replace: true })
+  }, [navigate])
+
+  return null
 }

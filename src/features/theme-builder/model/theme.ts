@@ -5,6 +5,8 @@ const PAIR_NAME_PATTERN = /^[a-z][a-z0-9-]*$/
 
 export type ThemeColor = string
 export type CssExportColorFormat = 'oklch' | 'hex'
+export type ThemeMode = 'light' | 'dark'
+export type AppAppearance = 'light' | 'dark'
 
 export interface ThemeColorPair {
   name: string
@@ -15,8 +17,13 @@ export interface ThemeColorPair {
   isCustom: boolean
 }
 
-export interface MainTheme {
+export interface ThemePalette {
   colorPairs: ThemeColorPair[]
+}
+
+export interface MainTheme {
+  light: ThemePalette
+  dark: ThemePalette
 }
 
 export interface AddThemeColorPairInput {
@@ -32,7 +39,8 @@ export interface AddThemeColorPairResult {
   error: string | null
 }
 
-export const MAIN_THEME_STORAGE_KEY = 'giga-shad.main-theme.v1'
+export const MAIN_THEME_STORAGE_KEY = 'giga-shad.main-theme.v2'
+export const LEGACY_MAIN_THEME_STORAGE_KEY = 'giga-shad.main-theme.v1'
 
 const RESERVED_BUTTON_VARIANT_NAMES = new Set([
   'default',
@@ -514,19 +522,24 @@ function getBuiltInThemePairDefinition(
   return BUILT_IN_THEME_PAIR_DEFINITION_MAP.get(pairName)
 }
 
+const DARK_THEME_VARIABLE_MAP = new Map(SHADCN_DARK_THEME_VARIABLES)
+
 function getBuiltInThemePairDefaults(
   definition: BuiltInThemePairDefinition,
+  mode: ThemeMode,
 ): Pick<ThemeColorPair, 'color' | 'foreground'> {
+  const variableMap =
+    mode === 'light' ? LIGHT_THEME_VARIABLE_MAP : DARK_THEME_VARIABLE_MAP
+
   return {
-    color: LIGHT_THEME_VARIABLE_MAP.get(definition.colorToken) ?? '#111827',
-    foreground:
-      LIGHT_THEME_VARIABLE_MAP.get(definition.foregroundToken) ?? '#f9fafb',
+    color: variableMap.get(definition.colorToken) ?? '#111827',
+    foreground: variableMap.get(definition.foregroundToken) ?? '#f9fafb',
   }
 }
 
-function createDefaultColorPairs(): ThemeColorPair[] {
+function createDefaultColorPairs(mode: ThemeMode): ThemeColorPair[] {
   return BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => {
-    const defaults = getBuiltInThemePairDefaults(definition)
+    const defaults = getBuiltInThemePairDefaults(definition, mode)
     return {
       name: definition.name,
       label: definition.label,
@@ -538,13 +551,64 @@ function createDefaultColorPairs(): ThemeColorPair[] {
   })
 }
 
-export const DEFAULT_MAIN_THEME: MainTheme = {
-  colorPairs: createDefaultColorPairs(),
+function cloneThemeColorPair(pair: ThemeColorPair): ThemeColorPair {
+  return { ...pair }
 }
 
-const DEFAULT_THEME_PAIR_BY_NAME = new Map(
-  DEFAULT_MAIN_THEME.colorPairs.map((pair) => [pair.name, pair]),
-)
+function cloneThemePalette(palette: ThemePalette): ThemePalette {
+  return {
+    colorPairs: palette.colorPairs.map(cloneThemeColorPair),
+  }
+}
+
+function cloneMainTheme(theme: MainTheme): MainTheme {
+  return {
+    light: cloneThemePalette(theme.light),
+    dark: cloneThemePalette(theme.dark),
+  }
+}
+
+const DEFAULT_THEME_PALETTE_BY_MODE: Record<ThemeMode, ThemePalette> = {
+  light: {
+    colorPairs: createDefaultColorPairs('light'),
+  },
+  dark: {
+    colorPairs: createDefaultColorPairs('dark'),
+  },
+}
+
+export const DEFAULT_MAIN_THEME: MainTheme = cloneMainTheme({
+  light: DEFAULT_THEME_PALETTE_BY_MODE.light,
+  dark: DEFAULT_THEME_PALETTE_BY_MODE.dark,
+})
+
+export function createDefaultMainTheme(): MainTheme {
+  return cloneMainTheme(DEFAULT_MAIN_THEME)
+}
+
+const DEFAULT_THEME_PAIR_BY_MODE_AND_NAME: Record<
+  ThemeMode,
+  Map<string, ThemeColorPair>
+> = {
+  light: new Map(
+    DEFAULT_THEME_PALETTE_BY_MODE.light.colorPairs.map((pair) => [pair.name, pair]),
+  ),
+  dark: new Map(
+    DEFAULT_THEME_PALETTE_BY_MODE.dark.colorPairs.map((pair) => [pair.name, pair]),
+  ),
+}
+
+function getDefaultThemePair(
+  mode: ThemeMode,
+  pairName: string,
+): ThemeColorPair | null {
+  const pair = DEFAULT_THEME_PAIR_BY_MODE_AND_NAME[mode].get(pairName)
+  return pair ? cloneThemeColorPair(pair) : null
+}
+
+function getThemePalette(theme: MainTheme, mode: ThemeMode): ThemePalette {
+  return mode === 'light' ? theme.light : theme.dark
+}
 
 export function normalizeThemePairName(value: string): string | null {
   const normalized = value
@@ -631,7 +695,10 @@ function ensureThemeColorPair(
   }
 }
 
-function mergeColorPairsWithDefaults(pairs: ThemeColorPair[]): ThemeColorPair[] {
+function mergeColorPairsWithDefaults(
+  pairs: ThemeColorPair[],
+  mode: ThemeMode,
+): ThemeColorPair[] {
   const builtInOverrides = new Map<string, ThemeColorPair>()
   const customPairs: ThemeColorPair[] = []
   const seenCustom = new Set<string>()
@@ -661,7 +728,7 @@ function mergeColorPairsWithDefaults(pairs: ThemeColorPair[]): ThemeColorPair[] 
 
   const builtInPairs = BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => {
     const override = builtInOverrides.get(definition.name)
-    const fallback = DEFAULT_THEME_PAIR_BY_NAME.get(definition.name)
+    const fallback = getDefaultThemePair(mode, definition.name)
     if (override) {
       return {
         ...override,
@@ -675,7 +742,7 @@ function mergeColorPairsWithDefaults(pairs: ThemeColorPair[]): ThemeColorPair[] 
       return { ...fallback }
     }
 
-    const defaults = getBuiltInThemePairDefaults(definition)
+    const defaults = getBuiltInThemePairDefaults(definition, mode)
     return {
       name: definition.name,
       label: definition.label,
@@ -687,6 +754,56 @@ function mergeColorPairsWithDefaults(pairs: ThemeColorPair[]): ThemeColorPair[] 
   })
 
   return [...builtInPairs, ...customPairs]
+}
+
+function normalizeThemePalette(
+  pairs: ThemeColorPair[],
+  mode: ThemeMode,
+): ThemePalette {
+  return {
+    colorPairs: mergeColorPairsWithDefaults(pairs, mode),
+  }
+}
+
+function getPrimaryPairDefaultsForPalette(
+  palette: ThemePalette,
+  mode: ThemeMode,
+): Pick<ThemeColorPair, 'color' | 'foreground'> {
+  const primaryPair = palette.colorPairs.find((pair) => pair.name === 'primary')
+  if (primaryPair) {
+    return {
+      color: primaryPair.color,
+      foreground: primaryPair.foreground,
+    }
+  }
+
+  const defaultPrimaryPair = getDefaultThemePair(mode, 'primary')
+  return {
+    color: defaultPrimaryPair?.color ?? '#111827',
+    foreground: defaultPrimaryPair?.foreground ?? '#f9fafb',
+  }
+}
+
+function createCustomPairForPalette(
+  palette: ThemePalette,
+  mode: ThemeMode,
+  options: {
+    name: string
+    label: string
+    includeInButtonVariant: boolean
+    color?: unknown
+    foreground?: unknown
+  },
+): ThemeColorPair {
+  const primaryDefaults = getPrimaryPairDefaultsForPalette(palette, mode)
+  return {
+    name: options.name,
+    label: options.label,
+    color: ensureThemeColor(options.color, primaryDefaults.color),
+    foreground: ensureThemeColor(options.foreground, primaryDefaults.foreground),
+    includeInButtonVariant: options.includeInButtonVariant,
+    isCustom: true,
+  }
 }
 
 function getThemePairTokenNames(pair: ThemeColorPair): {
@@ -707,23 +824,26 @@ function getThemePairTokenNames(pair: ThemeColorPair): {
   }
 }
 
-function getLightThemeVariablesWithOverrides(
+function getThemeVariablesWithOverrides(
   theme: MainTheme,
+  mode: ThemeMode,
 ): ReadonlyArray<readonly [string, string]> {
-  const variables = new Map<string, string>(SHADCN_LIGHT_THEME_VARIABLES)
+  const baseVariables =
+    mode === 'light' ? SHADCN_LIGHT_THEME_VARIABLES : SHADCN_DARK_THEME_VARIABLES
+  const variables = new Map<string, string>(baseVariables)
 
-  for (const pair of theme.colorPairs) {
+  for (const pair of getThemeColorPairs(theme, mode)) {
     const tokenNames = getThemePairTokenNames(pair)
     variables.set(tokenNames.colorToken, pair.color)
     variables.set(tokenNames.foregroundToken, pair.foreground)
   }
 
-  const orderedBaseVariables = SHADCN_LIGHT_THEME_VARIABLES.map(([name]) => [
+  const orderedBaseVariables = baseVariables.map(([name]) => [
     name,
     variables.get(name) ?? '',
   ])
 
-  const customVariables = getCustomThemeColorPairs(theme).flatMap((pair) => {
+  const customVariables = getCustomThemeColorPairs(theme, mode).flatMap((pair) => {
     const tokenNames = getThemePairTokenNames(pair)
     return [
       [tokenNames.colorToken, variables.get(tokenNames.colorToken) ?? pair.color],
@@ -735,20 +855,6 @@ function getLightThemeVariablesWithOverrides(
   })
 
   return [...orderedBaseVariables, ...customVariables]
-}
-
-function getDarkThemeVariablesWithCustomPairs(
-  theme: MainTheme,
-): ReadonlyArray<readonly [string, string]> {
-  const customVariables = getCustomThemeColorPairs(theme).flatMap((pair) => {
-    const tokenNames = getThemePairTokenNames(pair)
-    return [
-      [tokenNames.colorToken, pair.color],
-      [tokenNames.foregroundToken, pair.foreground],
-    ]
-  })
-
-  return [...SHADCN_DARK_THEME_VARIABLES, ...customVariables]
 }
 
 function mapThemeVariablesForExport(
@@ -770,10 +876,12 @@ function formatCssVariableBlock(
 }
 
 function formatThemeInlineBlock(theme: MainTheme): string {
-  const customPairLines = getCustomThemeColorPairs(theme).flatMap((pair) => [
-    `  --color-${pair.name}: var(--${pair.name});`,
-    `  --color-${pair.name}-foreground: var(--${pair.name}-foreground);`,
-  ])
+  const customPairLines = getCustomThemeColorPairs(theme, 'light').flatMap(
+    (pair) => [
+      `  --color-${pair.name}: var(--${pair.name});`,
+      `  --color-${pair.name}-foreground: var(--${pair.name}-foreground);`,
+    ],
+  )
 
   return `@theme inline {\n${[
     ...SHADCN_THEME_INLINE_BASE_LINES,
@@ -781,45 +889,167 @@ function formatThemeInlineBlock(theme: MainTheme): string {
   ].join('\n')}\n}`
 }
 
+function parseThemeColorPairsFromUnknown(
+  rawPairs: unknown,
+  mode: ThemeMode,
+): ThemeColorPair[] | null {
+  if (!Array.isArray(rawPairs)) {
+    return null
+  }
+
+  const parsedPairs: ThemeColorPair[] = []
+
+  for (const pairCandidate of rawPairs) {
+    if (!isRecord(pairCandidate)) {
+      continue
+    }
+
+    const name = normalizeThemePairName(
+      typeof pairCandidate.name === 'string' ? pairCandidate.name : '',
+    )
+    if (!name) {
+      continue
+    }
+
+    const fallbackPair =
+      getDefaultThemePair(mode, name) ??
+      createCustomPairForPalette(normalizeThemePalette([], mode), mode, {
+        name,
+        label: startCase(name),
+        includeInButtonVariant: false,
+      })
+
+    const pair = ensureThemeColorPair(pairCandidate, fallbackPair)
+    if (pair) {
+      parsedPairs.push(pair)
+    }
+  }
+
+  return parsedPairs
+}
+
+function synchronizeThemePalettes(
+  lightPalette: ThemePalette,
+  darkPalette: ThemePalette,
+): MainTheme {
+  const normalizedLight = normalizeThemePalette(lightPalette.colorPairs, 'light')
+  const normalizedDark = normalizeThemePalette(darkPalette.colorPairs, 'dark')
+
+  const lightBuiltInPairs = normalizedLight.colorPairs.filter(
+    (pair) => !pair.isCustom,
+  )
+  const darkBuiltInPairs = normalizedDark.colorPairs.filter((pair) => !pair.isCustom)
+
+  const lightCustomPairs = normalizedLight.colorPairs.filter((pair) => pair.isCustom)
+  const darkCustomPairs = normalizedDark.colorPairs.filter((pair) => pair.isCustom)
+
+  const lightCustomPairByName = new Map(
+    lightCustomPairs.map((pair) => [pair.name, pair]),
+  )
+  const darkCustomPairByName = new Map(darkCustomPairs.map((pair) => [pair.name, pair]))
+
+  const customPairNames: string[] = []
+  const seenCustomNames = new Set<string>()
+
+  for (const pair of lightCustomPairs) {
+    if (!seenCustomNames.has(pair.name)) {
+      seenCustomNames.add(pair.name)
+      customPairNames.push(pair.name)
+    }
+  }
+
+  for (const pair of darkCustomPairs) {
+    if (!seenCustomNames.has(pair.name)) {
+      seenCustomNames.add(pair.name)
+      customPairNames.push(pair.name)
+    }
+  }
+
+  const syncedLightCustomPairs: ThemeColorPair[] = []
+  const syncedDarkCustomPairs: ThemeColorPair[] = []
+
+  for (const name of customPairNames) {
+    const lightPair = lightCustomPairByName.get(name)
+    const darkPair = darkCustomPairByName.get(name)
+    const sourcePair = lightPair ?? darkPair
+    const label =
+      sourcePair && sourcePair.label.trim().length > 0
+        ? sourcePair.label
+        : startCase(name)
+    const includeInButtonVariant = Boolean(sourcePair?.includeInButtonVariant)
+
+    const syncedLightPair =
+      lightPair ??
+      createCustomPairForPalette(normalizedLight, 'light', {
+        name,
+        label,
+        includeInButtonVariant,
+      })
+    const syncedDarkPair =
+      darkPair ??
+      createCustomPairForPalette(normalizedDark, 'dark', {
+        name,
+        label,
+        includeInButtonVariant,
+      })
+
+    syncedLightCustomPairs.push({
+      ...syncedLightPair,
+      name,
+      label,
+      includeInButtonVariant,
+      isCustom: true,
+    })
+    syncedDarkCustomPairs.push({
+      ...syncedDarkPair,
+      name,
+      label,
+      includeInButtonVariant,
+      isCustom: true,
+    })
+  }
+
+  return {
+    light: {
+      colorPairs: [...lightBuiltInPairs, ...syncedLightCustomPairs],
+    },
+    dark: {
+      colorPairs: [...darkBuiltInPairs, ...syncedDarkCustomPairs],
+    },
+  }
+}
+
+function createThemeFromPalettePairs(
+  lightPairs: ThemeColorPair[],
+  darkPairs: ThemeColorPair[],
+): MainTheme {
+  return synchronizeThemePalettes(
+    normalizeThemePalette(lightPairs, 'light'),
+    normalizeThemePalette(darkPairs, 'dark'),
+  )
+}
+
 function normalizeMainTheme(value: unknown): MainTheme | null {
   if (!isRecord(value)) {
     return null
   }
 
-  if (Array.isArray(value.colorPairs)) {
-    const parsedPairs: ThemeColorPair[] = []
+  const maybeLightPairs = isRecord(value.light)
+    ? parseThemeColorPairsFromUnknown(value.light.colorPairs, 'light')
+    : null
+  const maybeDarkPairs = isRecord(value.dark)
+    ? parseThemeColorPairsFromUnknown(value.dark.colorPairs, 'dark')
+    : null
+  if (maybeLightPairs || maybeDarkPairs) {
+    return createThemeFromPalettePairs(
+      maybeLightPairs ?? DEFAULT_THEME_PALETTE_BY_MODE.light.colorPairs,
+      maybeDarkPairs ?? DEFAULT_THEME_PALETTE_BY_MODE.dark.colorPairs,
+    )
+  }
 
-    for (const pairCandidate of value.colorPairs) {
-      if (!isRecord(pairCandidate)) {
-        continue
-      }
-
-      const name = normalizeThemePairName(
-        typeof pairCandidate.name === 'string' ? pairCandidate.name : '',
-      )
-      if (!name) {
-        continue
-      }
-
-      const fallbackPair =
-        DEFAULT_THEME_PAIR_BY_NAME.get(name) ?? {
-          name,
-          label: startCase(name),
-          color: '#111827',
-          foreground: '#f9fafb',
-          includeInButtonVariant: false,
-          isCustom: true,
-        }
-
-      const pair = ensureThemeColorPair(pairCandidate, fallbackPair)
-      if (pair) {
-        parsedPairs.push(pair)
-      }
-    }
-
-    return {
-      colorPairs: mergeColorPairsWithDefaults(parsedPairs),
-    }
+  const legacyV1Pairs = parseThemeColorPairsFromUnknown(value.colorPairs, 'light')
+  if (legacyV1Pairs) {
+    return createThemeFromPalettePairs(legacyV1Pairs, [])
   }
 
   const hasLegacyShape =
@@ -832,50 +1062,92 @@ function normalizeMainTheme(value: unknown): MainTheme | null {
     return null
   }
 
-  const baseTheme = { ...DEFAULT_MAIN_THEME }
-  const withBackgroundOverride = updateThemeColorPair(baseTheme, 'background', {
-    color: ensureThemeColor(value.background, getThemeColorPair(baseTheme, 'background')?.color ?? '#ffffff'),
-    foreground: ensureThemeColor(
-      value.foreground,
-      getThemeColorPair(baseTheme, 'background')?.foreground ?? '#111827',
-    ),
+  let nextTheme = cloneMainTheme(DEFAULT_MAIN_THEME)
+  ;(['light', 'dark'] as const).forEach((mode) => {
+    const backgroundPair = getThemeColorPair(nextTheme, mode, 'background')
+    nextTheme = updateThemeColorPair(nextTheme, mode, 'background', {
+      color: ensureThemeColor(value.background, backgroundPair?.color ?? '#ffffff'),
+      foreground: ensureThemeColor(
+        value.foreground,
+        backgroundPair?.foreground ?? '#111827',
+      ),
+    })
+
+    const primaryPair = getThemeColorPair(nextTheme, mode, 'primary')
+    nextTheme = updateThemeColorPair(nextTheme, mode, 'primary', {
+      color: ensureThemeColor(value.primary, primaryPair?.color ?? '#111827'),
+      foreground: ensureThemeColor(
+        value.primaryForeground,
+        primaryPair?.foreground ?? '#f9fafb',
+      ),
+    })
   })
 
-  return updateThemeColorPair(withBackgroundOverride, 'primary', {
-    color: ensureThemeColor(
-      value.primary,
-      getThemeColorPair(baseTheme, 'primary')?.color ?? '#111827',
-    ),
-    foreground: ensureThemeColor(
-      value.primaryForeground,
-      getThemeColorPair(baseTheme, 'primary')?.foreground ?? '#f9fafb',
-    ),
-  })
+  return nextTheme
 }
 
 export function isMainTheme(value: unknown): value is MainTheme {
-  if (!isRecord(value) || !Array.isArray(value.colorPairs)) {
+  if (!isRecord(value)) {
     return false
   }
 
-  const seen = new Set<string>()
-  for (const pair of value.colorPairs) {
-    if (!isRecord(pair)) {
-      return false
+  if (
+    !isRecord(value.light) ||
+    !Array.isArray(value.light.colorPairs) ||
+    !isRecord(value.dark) ||
+    !Array.isArray(value.dark.colorPairs)
+  ) {
+    return false
+  }
+
+  const validatePalette = (paletteValue: unknown): string[] | null => {
+    if (!isRecord(paletteValue) || !Array.isArray(paletteValue.colorPairs)) {
+      return null
     }
 
-    const name = normalizeThemePairName(typeof pair.name === 'string' ? pair.name : '')
-    if (!name || seen.has(name)) {
-      return false
+    const names: string[] = []
+    const seen = new Set<string>()
+
+    for (const pairValue of paletteValue.colorPairs) {
+      if (!isRecord(pairValue)) {
+        return null
+      }
+
+      const rawName = typeof pairValue.name === 'string' ? pairValue.name : ''
+      const normalizedName = normalizeThemePairName(rawName)
+      if (!normalizedName || rawName !== normalizedName || seen.has(normalizedName)) {
+        return null
+      }
+      seen.add(normalizedName)
+
+      if (
+        typeof pairValue.label !== 'string' ||
+        !isThemeColor(pairValue.color) ||
+        !isThemeColor(pairValue.foreground) ||
+        typeof pairValue.includeInButtonVariant !== 'boolean' ||
+        typeof pairValue.isCustom !== 'boolean'
+      ) {
+        return null
+      }
+
+      names.push(normalizedName)
     }
 
-    seen.add(name)
+    return names
+  }
 
-    if (
-      !isThemeColor(pair.color) ||
-      !isThemeColor(pair.foreground) ||
-      typeof pair.label !== 'string'
-    ) {
+  const lightPairNames = validatePalette(value.light)
+  if (!lightPairNames) {
+    return false
+  }
+
+  const darkPairNames = validatePalette(value.dark)
+  if (!darkPairNames || darkPairNames.length !== lightPairNames.length) {
+    return false
+  }
+
+  for (let index = 0; index < lightPairNames.length; index += 1) {
+    if (lightPairNames[index] !== darkPairNames[index]) {
       return false
     }
   }
@@ -894,16 +1166,27 @@ export function parseMainTheme(raw: string): MainTheme | null {
 
 export function loadMainTheme(): MainTheme {
   if (typeof window === 'undefined') {
-    return { ...DEFAULT_MAIN_THEME }
+    return cloneMainTheme(DEFAULT_MAIN_THEME)
   }
 
-  const raw = window.localStorage.getItem(MAIN_THEME_STORAGE_KEY)
-  if (!raw) {
-    return { ...DEFAULT_MAIN_THEME }
+  const rawV2 = window.localStorage.getItem(MAIN_THEME_STORAGE_KEY)
+  if (rawV2) {
+    const parsedV2 = parseMainTheme(rawV2)
+    if (parsedV2) {
+      return parsedV2
+    }
   }
 
-  const parsed = parseMainTheme(raw)
-  return parsed ?? { ...DEFAULT_MAIN_THEME }
+  const rawV1 = window.localStorage.getItem(LEGACY_MAIN_THEME_STORAGE_KEY)
+  if (rawV1) {
+    const parsedV1 = parseMainTheme(rawV1)
+    if (parsedV1) {
+      saveMainTheme(parsedV1)
+      return parsedV1
+    }
+  }
+
+  return cloneMainTheme(DEFAULT_MAIN_THEME)
 }
 
 export function saveMainTheme(theme: MainTheme) {
@@ -914,20 +1197,30 @@ export function saveMainTheme(theme: MainTheme) {
   window.localStorage.setItem(MAIN_THEME_STORAGE_KEY, JSON.stringify(theme))
 }
 
-export function getThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
-  return [...theme.colorPairs]
+export function getThemeColorPairs(
+  theme: MainTheme,
+  mode: ThemeMode,
+): ThemeColorPair[] {
+  return [...getThemePalette(theme, mode).colorPairs]
 }
 
-export function getBuiltInThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
-  return theme.colorPairs.filter((pair) => !pair.isCustom)
+export function getBuiltInThemeColorPairs(
+  theme: MainTheme,
+  mode: ThemeMode,
+): ThemeColorPair[] {
+  return getThemePalette(theme, mode).colorPairs.filter((pair) => !pair.isCustom)
 }
 
-export function getCustomThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
-  return theme.colorPairs.filter((pair) => pair.isCustom)
+export function getCustomThemeColorPairs(
+  theme: MainTheme,
+  mode: ThemeMode,
+): ThemeColorPair[] {
+  return getThemePalette(theme, mode).colorPairs.filter((pair) => pair.isCustom)
 }
 
 export function getThemeColorPair(
   theme: MainTheme,
+  mode: ThemeMode,
   pairName: string,
 ): ThemeColorPair | null {
   const normalizedName = normalizeThemePairName(pairName)
@@ -935,16 +1228,20 @@ export function getThemeColorPair(
     return null
   }
 
-  const pair = theme.colorPairs.find((candidate) => candidate.name === normalizedName)
+  const palette = getThemePalette(theme, mode)
+  const pair = palette.colorPairs.find(
+    (candidate) => candidate.name === normalizedName,
+  )
   if (pair) {
     return pair
   }
 
-  return DEFAULT_THEME_PAIR_BY_NAME.get(normalizedName) ?? null
+  return getDefaultThemePair(mode, normalizedName)
 }
 
 export function updateThemeColorPair(
   theme: MainTheme,
+  mode: ThemeMode,
   pairName: string,
   updates: Partial<
     Pick<ThemeColorPair, 'label' | 'color' | 'foreground' | 'includeInButtonVariant'>
@@ -955,30 +1252,52 @@ export function updateThemeColorPair(
     return theme
   }
 
-  const nextPairs = theme.colorPairs.map((pair) => {
-    if (pair.name !== normalizedName) {
-      return pair
-    }
-
-    const nextLabel =
-      typeof updates.label === 'string' && updates.label.trim().length > 0
-        ? updates.label.trim()
-        : pair.label
-
-    return {
-      ...pair,
-      label: pair.isCustom ? nextLabel : pair.label,
-      color: ensureThemeColor(updates.color, pair.color),
-      foreground: ensureThemeColor(updates.foreground, pair.foreground),
-      includeInButtonVariant: pair.isCustom
-        ? Boolean(updates.includeInButtonVariant ?? pair.includeInButtonVariant)
-        : false,
-    }
-  })
-
-  return {
-    colorPairs: mergeColorPairsWithDefaults(nextPairs),
+  const hasPairInLight = theme.light.colorPairs.some(
+    (pair) => pair.name === normalizedName,
+  )
+  const hasPairInDark = theme.dark.colorPairs.some(
+    (pair) => pair.name === normalizedName,
+  )
+  if (!hasPairInLight && !hasPairInDark) {
+    return theme
   }
+
+  const nextLabel =
+    typeof updates.label === 'string' && updates.label.trim().length > 0
+      ? updates.label.trim()
+      : null
+  const nextIncludeInButtonVariant =
+    updates.includeInButtonVariant === undefined
+      ? null
+      : Boolean(updates.includeInButtonVariant)
+
+  const updatePalettePairs = (
+    currentMode: ThemeMode,
+    pairs: ThemeColorPair[],
+  ): ThemeColorPair[] =>
+    pairs.map((pair) => {
+      if (pair.name !== normalizedName) {
+        return pair
+      }
+
+      const shouldUpdateColors = currentMode === mode
+      return {
+        ...pair,
+        label: pair.isCustom && nextLabel ? nextLabel : pair.label,
+        color: shouldUpdateColors ? ensureThemeColor(updates.color, pair.color) : pair.color,
+        foreground: shouldUpdateColors
+          ? ensureThemeColor(updates.foreground, pair.foreground)
+          : pair.foreground,
+        includeInButtonVariant: pair.isCustom
+          ? (nextIncludeInButtonVariant ?? pair.includeInButtonVariant)
+          : false,
+      }
+    })
+
+  return createThemeFromPalettePairs(
+    updatePalettePairs('light', theme.light.colorPairs),
+    updatePalettePairs('dark', theme.dark.colorPairs),
+  )
 }
 
 export function addCustomThemeColorPair(
@@ -987,7 +1306,10 @@ export function addCustomThemeColorPair(
 ): AddThemeColorPairResult {
   const normalizedName = normalizeThemePairName(input.name)
   if (!normalizedName) {
-    return { theme, error: 'Name must start with a letter and use only a-z, 0-9, or -.' }
+    return {
+      theme,
+      error: 'Name must start with a letter and use only a-z, 0-9, or -.',
+    }
   }
 
   if (BUILT_IN_THEME_PAIR_NAMES.has(normalizedName)) {
@@ -1001,30 +1323,39 @@ export function addCustomThemeColorPair(
     }
   }
 
-  if (theme.colorPairs.some((pair) => pair.name === normalizedName)) {
+  if (
+    theme.light.colorPairs.some((pair) => pair.name === normalizedName) ||
+    theme.dark.colorPairs.some((pair) => pair.name === normalizedName)
+  ) {
     return { theme, error: 'A pair with this name already exists.' }
   }
 
-  const primaryPair = getThemeColorPair(theme, 'primary')
-  const nextPair: ThemeColorPair = {
+  const label =
+    typeof input.label === 'string' && input.label.trim().length > 0
+      ? input.label.trim()
+      : startCase(normalizedName)
+  const includeInButtonVariant = Boolean(input.includeInButtonVariant)
+
+  const nextLightPair = createCustomPairForPalette(theme.light, 'light', {
     name: normalizedName,
-    label:
-      typeof input.label === 'string' && input.label.trim().length > 0
-        ? input.label.trim()
-        : startCase(normalizedName),
-    color: ensureThemeColor(input.color, primaryPair?.color ?? '#111827'),
-    foreground: ensureThemeColor(
-      input.foreground,
-      primaryPair?.foreground ?? '#f9fafb',
-    ),
-    includeInButtonVariant: Boolean(input.includeInButtonVariant),
-    isCustom: true,
-  }
+    label,
+    includeInButtonVariant,
+    color: input.color,
+    foreground: input.foreground,
+  })
+  const nextDarkPair = createCustomPairForPalette(theme.dark, 'dark', {
+    name: normalizedName,
+    label,
+    includeInButtonVariant,
+    color: input.color,
+    foreground: input.foreground,
+  })
 
   return {
-    theme: {
-      colorPairs: [...theme.colorPairs, nextPair],
-    },
+    theme: createThemeFromPalettePairs(
+      [...theme.light.colorPairs, nextLightPair],
+      [...theme.dark.colorPairs, nextDarkPair],
+    ),
     error: null,
   }
 }
@@ -1034,11 +1365,11 @@ export function getMainThemeCss(
   colorFormat: CssExportColorFormat = 'oklch',
 ): string {
   const lightTheme = mapThemeVariablesForExport(
-    getLightThemeVariablesWithOverrides(theme),
+    getThemeVariablesWithOverrides(theme, 'light'),
     colorFormat,
   )
   const darkTheme = mapThemeVariablesForExport(
-    getDarkThemeVariablesWithCustomPairs(theme),
+    getThemeVariablesWithOverrides(theme, 'dark'),
     colorFormat,
   )
 
@@ -1050,7 +1381,7 @@ export function getMainThemeCss(
 }
 
 export function getMainThemeComponentTsx(theme: MainTheme): string {
-  const customVariantLines = getCustomThemeColorPairs(theme)
+  const customVariantLines = getCustomThemeColorPairs(theme, 'light')
     .filter((pair) => pair.includeInButtonVariant)
     .map(
       (pair) =>
