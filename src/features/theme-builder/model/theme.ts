@@ -1,0 +1,659 @@
+const HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+
+export type ThemeColor = string
+
+export type CssExportColorFormat = 'oklch' | 'hex'
+
+export interface MainTheme {
+  background: ThemeColor
+  foreground: ThemeColor
+  primary: ThemeColor
+  primaryForeground: ThemeColor
+}
+
+export const MAIN_THEME_STORAGE_KEY = 'giga-shad.main-theme.v1'
+
+export const DEFAULT_MAIN_THEME: MainTheme = {
+  background: '#ffffff',
+  foreground: '#111827',
+  primary: '#111827',
+  primaryForeground: '#f9fafb',
+}
+
+const SHADCN_THEME_INLINE = `@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}`
+
+const SHADCN_LIGHT_THEME_VARIABLES: ReadonlyArray<readonly [string, string]> = [
+  ['radius', '0.625rem'],
+  ['background', 'oklch(1 0 0)'],
+  ['foreground', 'oklch(0.147 0.004 49.25)'],
+  ['card', 'oklch(1 0 0)'],
+  ['card-foreground', 'oklch(0.147 0.004 49.25)'],
+  ['popover', 'oklch(1 0 0)'],
+  ['popover-foreground', 'oklch(0.147 0.004 49.25)'],
+  ['primary', 'oklch(0.216 0.006 56.043)'],
+  ['primary-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['secondary', 'oklch(0.97 0.001 106.424)'],
+  ['secondary-foreground', 'oklch(0.216 0.006 56.043)'],
+  ['muted', 'oklch(0.97 0.001 106.424)'],
+  ['muted-foreground', 'oklch(0.553 0.013 58.071)'],
+  ['accent', 'oklch(0.97 0.001 106.424)'],
+  ['accent-foreground', 'oklch(0.216 0.006 56.043)'],
+  ['destructive', 'oklch(0.577 0.245 27.325)'],
+  ['border', 'oklch(0.923 0.003 48.717)'],
+  ['input', 'oklch(0.923 0.003 48.717)'],
+  ['ring', 'oklch(0.709 0.01 56.259)'],
+  ['chart-1', 'oklch(0.646 0.222 41.116)'],
+  ['chart-2', 'oklch(0.6 0.118 184.704)'],
+  ['chart-3', 'oklch(0.398 0.07 227.392)'],
+  ['chart-4', 'oklch(0.828 0.189 84.429)'],
+  ['chart-5', 'oklch(0.769 0.188 70.08)'],
+  ['sidebar', 'oklch(0.985 0.001 106.423)'],
+  ['sidebar-foreground', 'oklch(0.147 0.004 49.25)'],
+  ['sidebar-primary', 'oklch(0.216 0.006 56.043)'],
+  ['sidebar-primary-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['sidebar-accent', 'oklch(0.97 0.001 106.424)'],
+  ['sidebar-accent-foreground', 'oklch(0.216 0.006 56.043)'],
+  ['sidebar-border', 'oklch(0.923 0.003 48.717)'],
+  ['sidebar-ring', 'oklch(0.709 0.01 56.259)'],
+]
+
+const SHADCN_DARK_THEME_VARIABLES: ReadonlyArray<readonly [string, string]> = [
+  ['background', 'oklch(0.147 0.004 49.25)'],
+  ['foreground', 'oklch(0.985 0.001 106.423)'],
+  ['card', 'oklch(0.216 0.006 56.043)'],
+  ['card-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['popover', 'oklch(0.216 0.006 56.043)'],
+  ['popover-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['primary', 'oklch(0.923 0.003 48.717)'],
+  ['primary-foreground', 'oklch(0.216 0.006 56.043)'],
+  ['secondary', 'oklch(0.268 0.007 34.298)'],
+  ['secondary-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['muted', 'oklch(0.268 0.007 34.298)'],
+  ['muted-foreground', 'oklch(0.709 0.01 56.259)'],
+  ['accent', 'oklch(0.268 0.007 34.298)'],
+  ['accent-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['destructive', 'oklch(0.704 0.191 22.216)'],
+  ['border', 'oklch(1 0 0 / 10%)'],
+  ['input', 'oklch(1 0 0 / 15%)'],
+  ['ring', 'oklch(0.553 0.013 58.071)'],
+  ['chart-1', 'oklch(0.488 0.243 264.376)'],
+  ['chart-2', 'oklch(0.696 0.17 162.48)'],
+  ['chart-3', 'oklch(0.769 0.188 70.08)'],
+  ['chart-4', 'oklch(0.627 0.265 303.9)'],
+  ['chart-5', 'oklch(0.645 0.246 16.439)'],
+  ['sidebar', 'oklch(0.216 0.006 56.043)'],
+  ['sidebar-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['sidebar-primary', 'oklch(0.488 0.243 264.376)'],
+  ['sidebar-primary-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['sidebar-accent', 'oklch(0.268 0.007 34.298)'],
+  ['sidebar-accent-foreground', 'oklch(0.985 0.001 106.423)'],
+  ['sidebar-border', 'oklch(1 0 0 / 10%)'],
+  ['sidebar-ring', 'oklch(0.553 0.013 58.071)'],
+]
+
+type RgbaColor = {
+  r: number
+  g: number
+  b: number
+  a: number
+}
+
+type ParsedOklch = {
+  l: number
+  c: number
+  h: number
+  a: number
+}
+
+const NUMBER_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
+const PERCENT_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)%$/
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (value < min) {
+    return min
+  }
+  if (value > max) {
+    return max
+  }
+  return value
+}
+
+function normalizeHue(value: number): number {
+  const wrapped = value % 360
+  return wrapped < 0 ? wrapped + 360 : wrapped
+}
+
+function formatNumber(value: number, precision = 3): string {
+  const rounded = Number(value.toFixed(precision))
+  return Object.is(rounded, -0) ? '0' : rounded.toString()
+}
+
+function formatAlpha(value: number): string {
+  return formatNumber(value, 3)
+}
+
+function channelToByte(value: number): number {
+  return Math.round(clamp(value, 0, 1) * 255)
+}
+
+function rgbaToHex({ r, g, b, a }: RgbaColor): string {
+  const red = channelToByte(r).toString(16).padStart(2, '0')
+  const green = channelToByte(g).toString(16).padStart(2, '0')
+  const blue = channelToByte(b).toString(16).padStart(2, '0')
+  const alpha = channelToByte(a).toString(16).padStart(2, '0')
+  if (alpha === 'ff') {
+    return `#${red}${green}${blue}`
+  }
+  return `#${red}${green}${blue}${alpha}`
+}
+
+function parseHexColor(value: string): RgbaColor | null {
+  if (!HEX_COLOR_PATTERN.test(value)) {
+    return null
+  }
+
+  let hex = value.slice(1).toLowerCase()
+  if (hex.length === 3 || hex.length === 4) {
+    hex = hex
+      .split('')
+      .map((char) => `${char}${char}`)
+      .join('')
+  }
+  if (hex.length === 6) {
+    hex = `${hex}ff`
+  }
+  if (hex.length !== 8) {
+    return null
+  }
+
+  const red = Number.parseInt(hex.slice(0, 2), 16)
+  const green = Number.parseInt(hex.slice(2, 4), 16)
+  const blue = Number.parseInt(hex.slice(4, 6), 16)
+  const alpha = Number.parseInt(hex.slice(6, 8), 16)
+
+  return {
+    r: red / 255,
+    g: green / 255,
+    b: blue / 255,
+    a: alpha / 255,
+  }
+}
+
+function parseNumericToken(
+  token: string,
+  options: { allowPercent: boolean },
+): number | null {
+  const trimmed = token.trim()
+  if (options.allowPercent && PERCENT_TOKEN_PATTERN.test(trimmed)) {
+    return Number.parseFloat(trimmed.slice(0, -1)) / 100
+  }
+  if (NUMBER_TOKEN_PATTERN.test(trimmed)) {
+    return Number.parseFloat(trimmed)
+  }
+  return null
+}
+
+function parseOklchColor(value: string): ParsedOklch | null {
+  const trimmed = value.trim()
+  if (!trimmed.toLowerCase().startsWith('oklch(') || !trimmed.endsWith(')')) {
+    return null
+  }
+
+  const rawContent = trimmed.slice(6, -1).trim()
+  const slashIndex = rawContent.indexOf('/')
+  if (slashIndex !== -1 && rawContent.lastIndexOf('/') !== slashIndex) {
+    return null
+  }
+
+  const channelPart =
+    slashIndex === -1 ? rawContent : rawContent.slice(0, slashIndex)
+  const alphaPart =
+    slashIndex === -1 ? null : rawContent.slice(slashIndex + 1).trim()
+  const channels = channelPart.trim().split(/\s+/)
+  if (channels.length !== 3) {
+    return null
+  }
+
+  const lightnessToken = channels[0]
+  const chromaToken = channels[1]
+  const hueToken = channels[2]
+
+  const lightness = parseNumericToken(lightnessToken, { allowPercent: true })
+  const chroma = parseNumericToken(chromaToken, { allowPercent: false })
+  const hue = parseNumericToken(hueToken, { allowPercent: false })
+  if (
+    lightness === null ||
+    chroma === null ||
+    hue === null ||
+    lightness < 0 ||
+    lightness > 1 ||
+    chroma < 0
+  ) {
+    return null
+  }
+
+  const alpha =
+    alphaPart === null || alphaPart.length === 0
+      ? 1
+      : parseNumericToken(alphaPart, { allowPercent: true })
+  if (alpha === null || !Number.isFinite(alpha) || alpha < 0 || alpha > 1) {
+    return null
+  }
+
+  return {
+    l: lightness,
+    c: chroma,
+    h: normalizeHue(hue),
+    a: alpha,
+  }
+}
+
+function formatOklch({ l, c, h, a }: ParsedOklch): string {
+  const color = `oklch(${formatNumber(l)} ${formatNumber(c)} ${formatNumber(h)})`
+  if (a >= 1) {
+    return color
+  }
+  return `${color.slice(0, -1)} / ${formatAlpha(a)})`
+}
+
+function normalizeHexColor(value: string): string | null {
+  const parsed = parseHexColor(value)
+  if (!parsed) {
+    return null
+  }
+  return rgbaToHex(parsed)
+}
+
+function normalizeOklchColor(value: string): string | null {
+  const parsed = parseOklchColor(value)
+  if (!parsed) {
+    return null
+  }
+  return formatOklch(parsed)
+}
+
+function srgbChannelToLinear(value: number): number {
+  if (value <= 0.04045) {
+    return value / 12.92
+  }
+  return ((value + 0.055) / 1.055) ** 2.4
+}
+
+function linearChannelToSrgb(value: number): number {
+  if (value <= 0.0031308) {
+    return 12.92 * value
+  }
+  return 1.055 * value ** (1 / 2.4) - 0.055
+}
+
+function oklchToHex(value: string): string | null {
+  const parsed = parseOklchColor(value)
+  if (!parsed) {
+    return null
+  }
+
+  const hueInRadians = (parsed.h * Math.PI) / 180
+  const a = parsed.c * Math.cos(hueInRadians)
+  const b = parsed.c * Math.sin(hueInRadians)
+
+  const lPrime = parsed.l + 0.3963377774 * a + 0.2158037573 * b
+  const mPrime = parsed.l - 0.1055613458 * a - 0.0638541728 * b
+  const sPrime = parsed.l - 0.0894841775 * a - 1.291485548 * b
+
+  const l = lPrime ** 3
+  const m = mPrime ** 3
+  const s = sPrime ** 3
+
+  const linearRed = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
+  const linearGreen = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
+  const linearBlue = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+
+  return rgbaToHex({
+    r: linearChannelToSrgb(clamp(linearRed, 0, 1)),
+    g: linearChannelToSrgb(clamp(linearGreen, 0, 1)),
+    b: linearChannelToSrgb(clamp(linearBlue, 0, 1)),
+    a: parsed.a,
+  })
+}
+
+function hexToOklch(value: string): string | null {
+  const parsed = parseHexColor(value)
+  if (!parsed) {
+    return null
+  }
+
+  const linearRed = srgbChannelToLinear(parsed.r)
+  const linearGreen = srgbChannelToLinear(parsed.g)
+  const linearBlue = srgbChannelToLinear(parsed.b)
+
+  const l =
+    0.4122214708 * linearRed +
+    0.5363325363 * linearGreen +
+    0.0514459929 * linearBlue
+  const m =
+    0.2119034982 * linearRed +
+    0.6806995451 * linearGreen +
+    0.1073969566 * linearBlue
+  const s =
+    0.0883024619 * linearRed +
+    0.2817188376 * linearGreen +
+    0.6299787005 * linearBlue
+
+  const lPrime = Math.cbrt(l)
+  const mPrime = Math.cbrt(m)
+  const sPrime = Math.cbrt(s)
+
+  const lightness =
+    0.2104542553 * lPrime + 0.793617785 * mPrime - 0.0040720468 * sPrime
+  const a =
+    1.9779984951 * lPrime - 2.428592205 * mPrime + 0.4505937099 * sPrime
+  const b =
+    0.0259040371 * lPrime + 0.7827717662 * mPrime - 0.808675766 * sPrime
+
+  const chroma = Math.sqrt(a * a + b * b)
+  const hue = chroma <= 1e-7 ? 0 : normalizeHue((Math.atan2(b, a) * 180) / Math.PI)
+
+  return formatOklch({
+    l: clamp(lightness, 0, 1),
+    c: chroma,
+    h: hue,
+    a: parsed.a,
+  })
+}
+
+export function normalizeThemeColor(value: unknown): ThemeColor | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+  if (trimmed.length === 0) {
+    return null
+  }
+
+  return normalizeHexColor(trimmed) ?? normalizeOklchColor(trimmed)
+}
+
+export function isThemeColor(value: unknown): value is ThemeColor {
+  return normalizeThemeColor(value) !== null
+}
+
+export function toHexColor(value: ThemeColor): string | null {
+  return normalizeHexColor(value) ?? oklchToHex(value)
+}
+
+export function toOklchColor(value: ThemeColor): string | null {
+  return normalizeOklchColor(value) ?? hexToOklch(value)
+}
+
+function formatColorForExport(
+  value: ThemeColor,
+  colorFormat: CssExportColorFormat,
+): string {
+  if (colorFormat === 'hex') {
+    return toHexColor(value) ?? value
+  }
+  return toOklchColor(value) ?? value
+}
+
+function formatMainThemeForExport(
+  theme: MainTheme,
+  colorFormat: CssExportColorFormat,
+): MainTheme {
+  return {
+    background: formatColorForExport(theme.background, colorFormat),
+    foreground: formatColorForExport(theme.foreground, colorFormat),
+    primary: formatColorForExport(theme.primary, colorFormat),
+    primaryForeground: formatColorForExport(theme.primaryForeground, colorFormat),
+  }
+}
+
+function ensureThemeColor(value: unknown, fallback: ThemeColor): ThemeColor {
+  return normalizeThemeColor(value) ?? fallback
+}
+
+function mapThemeVariablesForExport(
+  variables: ReadonlyArray<readonly [string, string]>,
+  colorFormat: CssExportColorFormat,
+): ReadonlyArray<readonly [string, string]> {
+  return variables.map(([name, value]) => {
+    return [name, formatColorForExport(value, colorFormat)]
+  })
+}
+
+function formatCssVariableBlock(
+  selector: string,
+  variables: ReadonlyArray<readonly [string, string]>,
+): string {
+  const lines = variables.map(([name, value]) => `  --${name}: ${value};`)
+  return `${selector} {\n${lines.join('\n')}\n}`
+}
+
+function getLightThemeVariablesWithOverrides(
+  theme: MainTheme,
+): ReadonlyArray<readonly [string, string]> {
+  const overrides = new Map<string, string>([
+    ['background', theme.background],
+    ['foreground', theme.foreground],
+    ['primary', theme.primary],
+    ['primary-foreground', theme.primaryForeground],
+  ])
+
+  return SHADCN_LIGHT_THEME_VARIABLES.map(([name, value]) => [
+    name,
+    overrides.get(name) ?? value,
+  ])
+}
+
+export function isMainTheme(value: unknown): value is MainTheme {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return (
+    isThemeColor(value.background) &&
+    isThemeColor(value.foreground) &&
+    isThemeColor(value.primary) &&
+    isThemeColor(value.primaryForeground)
+  )
+}
+
+export function parseMainTheme(raw: string): MainTheme | null {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isMainTheme(parsed)) {
+      return null
+    }
+
+    return {
+      background: ensureThemeColor(parsed.background, DEFAULT_MAIN_THEME.background),
+      foreground: ensureThemeColor(parsed.foreground, DEFAULT_MAIN_THEME.foreground),
+      primary: ensureThemeColor(parsed.primary, DEFAULT_MAIN_THEME.primary),
+      primaryForeground: ensureThemeColor(
+        parsed.primaryForeground,
+        DEFAULT_MAIN_THEME.primaryForeground,
+      ),
+    }
+  } catch {
+    return null
+  }
+}
+
+function normalizeTheme(value: unknown): MainTheme | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  return {
+    background: ensureThemeColor(value.background, DEFAULT_MAIN_THEME.background),
+    foreground: ensureThemeColor(value.foreground, DEFAULT_MAIN_THEME.foreground),
+    primary: ensureThemeColor(value.primary, DEFAULT_MAIN_THEME.primary),
+    primaryForeground: ensureThemeColor(
+      value.primaryForeground,
+      DEFAULT_MAIN_THEME.primaryForeground,
+    ),
+  }
+}
+
+export function loadMainTheme(): MainTheme {
+  if (typeof window === 'undefined') {
+    return { ...DEFAULT_MAIN_THEME }
+  }
+
+  const raw = window.localStorage.getItem(MAIN_THEME_STORAGE_KEY)
+  if (!raw) {
+    return { ...DEFAULT_MAIN_THEME }
+  }
+
+  const parsed = parseMainTheme(raw)
+  if (parsed) {
+    return parsed
+  }
+  try {
+    const unsafeParsed: unknown = JSON.parse(raw)
+    const normalized = normalizeTheme(unsafeParsed)
+    return normalized ?? { ...DEFAULT_MAIN_THEME }
+  } catch {
+    return { ...DEFAULT_MAIN_THEME }
+  }
+}
+
+export function saveMainTheme(theme: MainTheme) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(MAIN_THEME_STORAGE_KEY, JSON.stringify(theme))
+}
+
+export function getMainThemeCss(
+  theme: MainTheme,
+  colorFormat: CssExportColorFormat = 'oklch',
+): string {
+  const lightTheme = mapThemeVariablesForExport(
+    getLightThemeVariablesWithOverrides(theme),
+    colorFormat,
+  )
+  const darkTheme = mapThemeVariablesForExport(
+    SHADCN_DARK_THEME_VARIABLES,
+    colorFormat,
+  )
+
+  return [
+    SHADCN_THEME_INLINE,
+    formatCssVariableBlock(':root', lightTheme),
+    formatCssVariableBlock('.dark', darkTheme),
+  ].join('\n\n')
+}
+
+export function getMainThemeComponentTsx(): string {
+  return `import * as React from 'react'
+import { cva } from 'class-variance-authority'
+import type { VariantProps } from 'class-variance-authority'
+import { Slot } from 'radix-ui'
+
+import { cn } from '@/lib/utils'
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive:
+          'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+        outline:
+          'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+        secondary:
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost:
+          'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-9 px-4 py-2 has-[>svg]:px-3',
+        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
+        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
+        icon: 'size-9',
+        'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
+        'icon-sm': 'size-8',
+        'icon-lg': 'size-10',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+)
+
+function Button({
+  className,
+  variant = 'default',
+  size = 'default',
+  asChild = false,
+  ...props
+}: React.ComponentProps<'button'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+  }) {
+  const Comp = asChild ? Slot.Root : 'button'
+
+  return (
+    <Comp
+      data-slot="button"
+      data-variant={variant}
+      data-size={size}
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+
+export { Button, buttonVariants }
+`
+}

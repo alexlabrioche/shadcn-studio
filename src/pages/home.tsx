@@ -1,9 +1,5 @@
-import { Button } from '@/components/ui/button'
+import { ThemeBuilderPage } from '@/features/theme-builder'
 
 export function Home() {
-  return (
-    <div className="min-h-screen bg-linear-to-b from-slate-900 via-slate-800 to-slate-900">
-      <Button>Home</Button>
-    </div>
-  )
+  return <ThemeBuilderPage />
 }
