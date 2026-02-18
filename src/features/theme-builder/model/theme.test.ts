@@ -2,32 +2,43 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_MAIN_THEME,
+  addCustomThemeColorPair,
   getMainThemeComponentTsx,
   getMainThemeCss,
+  getThemeColorPair,
   isMainTheme,
   normalizeThemeColor,
   parseMainTheme,
   toHexColor,
   toOklchColor,
+  updateThemeColorPair,
 } from '@/features/theme-builder/model/theme'
 
 describe('theme model', () => {
   it('validates theme shape', () => {
     expect(isMainTheme(DEFAULT_MAIN_THEME)).toBe(true)
+    expect(isMainTheme({ colorPairs: [] })).toBe(true)
     expect(isMainTheme({ background: 'x' })).toBe(false)
-    expect(
-      isMainTheme({
-        ...DEFAULT_MAIN_THEME,
-        primary: 'oklch(0.5 0.1 20)',
-      }),
-    ).toBe(true)
   })
 
-  it('parses valid JSON and rejects invalid payloads', () => {
+  it('parses valid JSON and migrates legacy payloads', () => {
     const raw = JSON.stringify(DEFAULT_MAIN_THEME)
     expect(parseMainTheme(raw)).toEqual(DEFAULT_MAIN_THEME)
-    expect(parseMainTheme('{"bad":"shape"}')).toBeNull()
-    expect(parseMainTheme('not-json')).toBeNull()
+
+    const legacy = parseMainTheme(
+      JSON.stringify({
+        background: '#000000',
+        foreground: '#ffffff',
+        primary: '#111111',
+        primaryForeground: '#f5f5f5',
+      }),
+    )
+
+    expect(legacy).not.toBeNull()
+    expect(getThemeColorPair(legacy!, 'background')?.color).toBe('#000000')
+    expect(getThemeColorPair(legacy!, 'background')?.foreground).toBe('#ffffff')
+    expect(getThemeColorPair(legacy!, 'primary')?.color).toBe('#111111')
+    expect(getThemeColorPair(legacy!, 'primary')?.foreground).toBe('#f5f5f5')
   })
 
   it('normalizes and converts theme colors', () => {
@@ -38,53 +49,60 @@ describe('theme model', () => {
     expect(toOklchColor('#ffffff')).toBe('oklch(1 0 0)')
   })
 
-  it('creates oklch export css with shadcn defaults and custom overrides', () => {
-    const css = getMainThemeCss(
-      {
-        ...DEFAULT_MAIN_THEME,
-        background: '#123456',
-        foreground: '#abcdef',
-        primary: '#0f0f0f',
-        primaryForeground: '#fefefe',
-      },
-      'oklch',
-    )
+  it('creates export css with semantic pair overrides and custom pairs', () => {
+    const withPairUpdates = updateThemeColorPair(DEFAULT_MAIN_THEME, 'card', {
+      color: '#123456',
+      foreground: '#f0f0f0',
+    })
+    const customResult = addCustomThemeColorPair(withPairUpdates, {
+      name: 'brand',
+      includeInButtonVariant: true,
+      color: '#222222',
+      foreground: '#eeeeee',
+    })
+
+    expect(customResult.error).toBeNull()
+
+    const css = getMainThemeCss(customResult.theme, 'oklch')
 
     expect(css).toContain('@theme inline {')
-    expect(css).toContain(':root {')
-    expect(css).toContain('.dark {')
-    expect(css).toContain('--radius: 0.625rem;')
-    expect(css).toContain('--chart-5: oklch(0.645 0.246 16.439);')
-    expect(css).toContain('--background: oklch(')
-    expect(css).toContain('--background: oklch(0.147 0.004 49.25);')
+    expect(css).toContain('--color-brand: var(--brand);')
+    expect(css).toContain('--color-brand-foreground: var(--brand-foreground);')
+    expect(css).toContain('--card: oklch(')
+    expect(css).toContain('--brand: oklch(')
+    expect(css).toContain('--brand-foreground: oklch(')
   })
 
   it('creates hex export css without oklch values', () => {
-    const css = getMainThemeCss(
-      {
-        ...DEFAULT_MAIN_THEME,
-        background: 'oklch(1 0 0)',
-        foreground: 'oklch(0 0 0)',
-        primary: 'oklch(0.21 0.03 250)',
-        primaryForeground: 'oklch(0.98 0.01 250)',
-      },
-      'hex',
-    )
+    const customResult = addCustomThemeColorPair(DEFAULT_MAIN_THEME, {
+      name: 'brand',
+      includeInButtonVariant: false,
+      color: 'oklch(1 0 0)',
+      foreground: 'oklch(0 0 0)',
+    })
+
+    const css = getMainThemeCss(customResult.theme, 'hex')
 
     expect(css).toContain('--background: #ffffff;')
-    expect(css).toContain('--foreground: #000000;')
+    expect(css).toContain('--brand: #ffffff;')
+    expect(css).toContain('--brand-foreground: #000000;')
     expect(css).not.toContain('oklch(')
   })
 
-  it('creates a raw button component tsx export', () => {
-    const tsx = getMainThemeComponentTsx()
+  it('creates button component tsx with custom opt-in variants', () => {
+    const withVariant = addCustomThemeColorPair(DEFAULT_MAIN_THEME, {
+      name: 'brand',
+      includeInButtonVariant: true,
+    })
+    const withoutVariant = addCustomThemeColorPair(withVariant.theme, {
+      name: 'marketing',
+      includeInButtonVariant: false,
+    })
+    const tsx = getMainThemeComponentTsx(withoutVariant.theme)
 
     expect(tsx).toContain("import { cva } from 'class-variance-authority'")
-    expect(tsx).toContain("import { Slot } from 'radix-ui'")
-    expect(tsx).toContain("import { cn } from '@/lib/utils'")
-    expect(tsx).toContain('const buttonVariants = cva(')
-    expect(tsx).toContain('function Button({')
+    expect(tsx).toContain("'brand': 'bg-brand text-brand-foreground hover:bg-brand/90'")
+    expect(tsx).not.toContain('marketing')
     expect(tsx).toContain('export { Button, buttonVariants }')
-    expect(tsx).not.toContain('themeStyle')
   })
 })

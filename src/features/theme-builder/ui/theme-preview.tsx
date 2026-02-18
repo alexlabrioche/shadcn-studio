@@ -2,6 +2,7 @@ import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getThemeColorPair } from '@/features/theme-builder/model/theme'
 import type { MainTheme } from '@/features/theme-builder/model/theme'
 
 interface ThemePreviewProps {
@@ -9,12 +10,15 @@ interface ThemePreviewProps {
 }
 
 export function ThemePreview({ theme }: ThemePreviewProps) {
+  const backgroundPair = getThemeColorPair(theme, 'background')
+  const primaryPair = getThemeColorPair(theme, 'primary')
+
   const previewStyle = {
-    '--background': theme.background,
-    '--foreground': theme.foreground,
-    '--primary': theme.primary,
-    '--primary-foreground': theme.primaryForeground,
-    '--border': theme.foreground,
+    '--background': backgroundPair?.color ?? '#ffffff',
+    '--foreground': backgroundPair?.foreground ?? '#111827',
+    '--primary': primaryPair?.color ?? '#111827',
+    '--primary-foreground': primaryPair?.foreground ?? '#f9fafb',
+    '--border': backgroundPair?.foreground ?? '#111827',
   } as React.CSSProperties
 
   return (

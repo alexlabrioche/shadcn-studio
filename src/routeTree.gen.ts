@@ -9,8 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ThemeDesignerRouteImport } from './routes/theme-designer'
+import { Route as MvpPreviewRouteImport } from './routes/mvp-preview'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ThemeDesignerRoute = ThemeDesignerRouteImport.update({
+  id: '/theme-designer',
+  path: '/theme-designer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MvpPreviewRoute = MvpPreviewRouteImport.update({
+  id: '/mvp-preview',
+  path: '/mvp-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +31,50 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/mvp-preview': typeof MvpPreviewRoute
+  '/theme-designer': typeof ThemeDesignerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/mvp-preview': typeof MvpPreviewRoute
+  '/theme-designer': typeof ThemeDesignerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/mvp-preview': typeof MvpPreviewRoute
+  '/theme-designer': typeof ThemeDesignerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/mvp-preview' | '/theme-designer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/mvp-preview' | '/theme-designer'
+  id: '__root__' | '/' | '/mvp-preview' | '/theme-designer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MvpPreviewRoute: typeof MvpPreviewRoute
+  ThemeDesignerRoute: typeof ThemeDesignerRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/theme-designer': {
+      id: '/theme-designer'
+      path: '/theme-designer'
+      fullPath: '/theme-designer'
+      preLoaderRoute: typeof ThemeDesignerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mvp-preview': {
+      id: '/mvp-preview'
+      path: '/mvp-preview'
+      fullPath: '/mvp-preview'
+      preLoaderRoute: typeof MvpPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +87,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MvpPreviewRoute: MvpPreviewRoute,
+  ThemeDesignerRoute: ThemeDesignerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

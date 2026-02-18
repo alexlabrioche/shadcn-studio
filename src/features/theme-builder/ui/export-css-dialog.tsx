@@ -80,7 +80,7 @@ export function ExportCssDialog({
           </div>
         </div>
 
-        <div className="bg-muted max-h-[360px] overflow-auto rounded-md border p-3">
+        <div className="bg-muted max-h-[360px] overflow-auto overscroll-contain rounded-md border p-3">
           <pre className="text-xs leading-5 whitespace-pre-wrap">
             <code>{exportCss}</code>
           </pre>

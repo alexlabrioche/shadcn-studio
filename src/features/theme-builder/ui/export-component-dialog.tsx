@@ -51,11 +51,12 @@ export function ExportComponentDialog({
           <DialogTitle>Component TSX Export</DialogTitle>
           <DialogDescription>
             This exports the raw shadcn button component definition as a
-            copy-ready `.tsx` file.
+            copy-ready `.tsx` file, including any custom color-pair variants
+            you opted into.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="bg-muted max-h-[360px] overflow-auto rounded-md border p-3">
+        <div className="bg-muted max-h-[360px] overflow-auto overscroll-contain rounded-md border p-3">
           <pre className="text-xs leading-5 whitespace-pre-wrap">
             <code>{exportComponentTsx}</code>
           </pre>

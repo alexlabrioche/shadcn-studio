@@ -1,7 +1,12 @@
 import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import {
   DEFAULT_MAIN_THEME,
   getMainThemeComponentTsx,
@@ -9,13 +14,33 @@ import {
   loadMainTheme,
   saveMainTheme,
 } from '@/features/theme-builder/model/theme'
-import type { CssExportColorFormat, MainTheme } from '@/features/theme-builder/model/theme'
-import { ColorField } from '@/features/theme-builder/ui/color-field'
+import type {
+  CssExportColorFormat,
+  MainTheme,
+} from '@/features/theme-builder/model/theme'
 import { ExportComponentDialog } from '@/features/theme-builder/ui/export-component-dialog'
 import { ExportCssDialog } from '@/features/theme-builder/ui/export-css-dialog'
+import { ThemeBuilderSidebar } from '@/features/theme-builder/ui/theme-builder-sidebar'
+import { ThemeDesignerPanel } from '@/features/theme-builder/ui/theme-designer-panel'
 import { ThemePreview } from '@/features/theme-builder/ui/theme-preview'
 
-export function ThemeBuilderPage() {
+export type ThemeBuilderView = 'mvp-preview' | 'theme-designer'
+
+interface ThemeBuilderScreenProps {
+  activeView: ThemeBuilderView
+}
+
+function getViewTitle(activeView: ThemeBuilderView): string {
+  return activeView === 'mvp-preview' ? 'MVP Preview' : 'Theme Designer'
+}
+
+function getViewSubtitle(activeView: ThemeBuilderView): string {
+  return activeView === 'mvp-preview'
+    ? 'Preview your current component styling'
+    : 'Edit semantic color pairs and variants'
+}
+
+export function ThemeBuilderScreen({ activeView }: ThemeBuilderScreenProps) {
   const [theme, setTheme] = React.useState<MainTheme>(() => loadMainTheme())
   const [exportColorFormat, setExportColorFormat] =
     React.useState<CssExportColorFormat>('oklch')
@@ -28,75 +53,57 @@ export function ThemeBuilderPage() {
     () => getMainThemeCss(theme, exportColorFormat),
     [exportColorFormat, theme],
   )
-  const exportComponentTsx = React.useMemo(() => getMainThemeComponentTsx(), [])
+  const exportComponentTsx = React.useMemo(
+    () => getMainThemeComponentTsx(theme),
+    [theme],
+  )
 
   return (
-    <main className="min-h-screen bg-linear-to-b from-zinc-100 via-white to-zinc-50 p-6">
-      <div className="mx-auto grid w-full max-w-6xl gap-4 lg:grid-cols-[1fr_360px]">
-        <ThemePreview theme={theme} />
+    <SidebarProvider className="h-dvh min-h-dvh overflow-hidden">
+      <ThemeBuilderSidebar activeView={activeView} />
+      <SidebarInset className="min-h-0 overflow-hidden">
+        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/75 sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b px-3 backdrop-blur md:px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-1 h-4" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">
+              {getViewTitle(activeView)}
+            </p>
+            <p className="text-muted-foreground truncate text-xs">
+              {getViewSubtitle(activeView)}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setTheme(DEFAULT_MAIN_THEME)}
+          >
+            Reset
+          </Button>
+          <ExportCssDialog
+            exportCss={exportCss}
+            exportColorFormat={exportColorFormat}
+            onExportColorFormatChange={setExportColorFormat}
+          />
+          <ExportComponentDialog exportComponentTsx={exportComponentTsx} />
+        </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Main Theme</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <ColorField
-              label="background"
-              value={theme.background}
-              pickerFallbackHex="#ffffff"
-              onChange={(value) =>
-                setTheme((previous) => ({ ...previous, background: value }))
-              }
-            />
-            <ColorField
-              label="foreground"
-              value={theme.foreground}
-              pickerFallbackHex="#111827"
-              onChange={(value) =>
-                setTheme((previous) => ({ ...previous, foreground: value }))
-              }
-            />
-            <ColorField
-              label="primary"
-              value={theme.primary}
-              pickerFallbackHex="#111827"
-              onChange={(value) =>
-                setTheme((previous) => ({ ...previous, primary: value }))
-              }
-            />
-            <ColorField
-              label="primary-foreground"
-              value={theme.primaryForeground}
-              pickerFallbackHex="#f9fafb"
-              onChange={(value) =>
-                setTheme((previous) => ({
-                  ...previous,
-                  primaryForeground: value,
-                }))
-              }
-            />
-          </CardContent>
-          <CardFooter>
-            <div className="flex w-full flex-wrap items-center justify-between gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setTheme(DEFAULT_MAIN_THEME)}
-              >
-                Reset
-              </Button>
-
-              <div className="flex items-center gap-2">
-                <ExportCssDialog
-                  exportCss={exportCss}
-                  exportColorFormat={exportColorFormat}
-                  onExportColorFormatChange={setExportColorFormat}
-                />
-                <ExportComponentDialog exportComponentTsx={exportComponentTsx} />
-              </div>
+        <div className="bg-linear-to-b from-zinc-100 via-white to-zinc-50 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-none p-4 md:p-6">
+          {activeView === 'mvp-preview' ? (
+            <div className="mx-auto w-full max-w-5xl">
+              <ThemePreview theme={theme} />
             </div>
-          </CardFooter>
-        </Card>
-      </div>
-    </main>
+          ) : (
+            <div className="mx-auto w-full max-w-5xl">
+              <ThemeDesignerPanel
+                theme={theme}
+                onThemeChange={(updater) =>
+                  setTheme((previous) => updater(previous))
+                }
+              />
+            </div>
+          )}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

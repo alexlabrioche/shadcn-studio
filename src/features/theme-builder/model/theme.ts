@@ -1,65 +1,162 @@
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
+const NUMBER_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
+const PERCENT_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)%$/
+const PAIR_NAME_PATTERN = /^[a-z][a-z0-9-]*$/
 
 export type ThemeColor = string
-
 export type CssExportColorFormat = 'oklch' | 'hex'
 
-export interface MainTheme {
-  background: ThemeColor
+export interface ThemeColorPair {
+  name: string
+  label: string
+  color: ThemeColor
   foreground: ThemeColor
-  primary: ThemeColor
-  primaryForeground: ThemeColor
+  includeInButtonVariant: boolean
+  isCustom: boolean
+}
+
+export interface MainTheme {
+  colorPairs: ThemeColorPair[]
+}
+
+export interface AddThemeColorPairInput {
+  name: string
+  label?: string
+  color?: ThemeColor
+  foreground?: ThemeColor
+  includeInButtonVariant: boolean
+}
+
+export interface AddThemeColorPairResult {
+  theme: MainTheme
+  error: string | null
 }
 
 export const MAIN_THEME_STORAGE_KEY = 'giga-shad.main-theme.v1'
 
-export const DEFAULT_MAIN_THEME: MainTheme = {
-  background: '#ffffff',
-  foreground: '#111827',
-  primary: '#111827',
-  primaryForeground: '#f9fafb',
+const RESERVED_BUTTON_VARIANT_NAMES = new Set([
+  'default',
+  'destructive',
+  'outline',
+  'secondary',
+  'ghost',
+  'link',
+])
+
+type BuiltInThemePairDefinition = {
+  name: string
+  label: string
+  colorToken: string
+  foregroundToken: string
 }
 
-const SHADCN_THEME_INLINE = `@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}`
+const BUILT_IN_THEME_PAIR_DEFINITIONS: ReadonlyArray<BuiltInThemePairDefinition> = [
+  {
+    name: 'background',
+    label: 'Background',
+    colorToken: 'background',
+    foregroundToken: 'foreground',
+  },
+  {
+    name: 'card',
+    label: 'Card',
+    colorToken: 'card',
+    foregroundToken: 'card-foreground',
+  },
+  {
+    name: 'popover',
+    label: 'Popover',
+    colorToken: 'popover',
+    foregroundToken: 'popover-foreground',
+  },
+  {
+    name: 'primary',
+    label: 'Primary',
+    colorToken: 'primary',
+    foregroundToken: 'primary-foreground',
+  },
+  {
+    name: 'secondary',
+    label: 'Secondary',
+    colorToken: 'secondary',
+    foregroundToken: 'secondary-foreground',
+  },
+  {
+    name: 'muted',
+    label: 'Muted',
+    colorToken: 'muted',
+    foregroundToken: 'muted-foreground',
+  },
+  {
+    name: 'accent',
+    label: 'Accent',
+    colorToken: 'accent',
+    foregroundToken: 'accent-foreground',
+  },
+  {
+    name: 'sidebar',
+    label: 'Sidebar',
+    colorToken: 'sidebar',
+    foregroundToken: 'sidebar-foreground',
+  },
+  {
+    name: 'sidebar-primary',
+    label: 'Sidebar Primary',
+    colorToken: 'sidebar-primary',
+    foregroundToken: 'sidebar-primary-foreground',
+  },
+  {
+    name: 'sidebar-accent',
+    label: 'Sidebar Accent',
+    colorToken: 'sidebar-accent',
+    foregroundToken: 'sidebar-accent-foreground',
+  },
+]
+
+const BUILT_IN_THEME_PAIR_NAMES = new Set(
+  BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => definition.name),
+)
+
+const SHADCN_THEME_INLINE_BASE_LINES = [
+  '  --radius-sm: calc(var(--radius) - 4px);',
+  '  --radius-md: calc(var(--radius) - 2px);',
+  '  --radius-lg: var(--radius);',
+  '  --radius-xl: calc(var(--radius) + 4px);',
+  '  --radius-2xl: calc(var(--radius) + 8px);',
+  '  --radius-3xl: calc(var(--radius) + 12px);',
+  '  --radius-4xl: calc(var(--radius) + 16px);',
+  '  --color-background: var(--background);',
+  '  --color-foreground: var(--foreground);',
+  '  --color-card: var(--card);',
+  '  --color-card-foreground: var(--card-foreground);',
+  '  --color-popover: var(--popover);',
+  '  --color-popover-foreground: var(--popover-foreground);',
+  '  --color-primary: var(--primary);',
+  '  --color-primary-foreground: var(--primary-foreground);',
+  '  --color-secondary: var(--secondary);',
+  '  --color-secondary-foreground: var(--secondary-foreground);',
+  '  --color-muted: var(--muted);',
+  '  --color-muted-foreground: var(--muted-foreground);',
+  '  --color-accent: var(--accent);',
+  '  --color-accent-foreground: var(--accent-foreground);',
+  '  --color-destructive: var(--destructive);',
+  '  --color-border: var(--border);',
+  '  --color-input: var(--input);',
+  '  --color-ring: var(--ring);',
+  '  --color-chart-1: var(--chart-1);',
+  '  --color-chart-2: var(--chart-2);',
+  '  --color-chart-3: var(--chart-3);',
+  '  --color-chart-4: var(--chart-4);',
+  '  --color-chart-5: var(--chart-5);',
+  '  --color-sidebar: var(--sidebar);',
+  '  --color-sidebar-foreground: var(--sidebar-foreground);',
+  '  --color-sidebar-primary: var(--sidebar-primary);',
+  '  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);',
+  '  --color-sidebar-accent: var(--sidebar-accent);',
+  '  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);',
+  '  --color-sidebar-border: var(--sidebar-border);',
+  '  --color-sidebar-ring: var(--sidebar-ring);',
+]
 
 const SHADCN_LIGHT_THEME_VARIABLES: ReadonlyArray<readonly [string, string]> = [
   ['radius', '0.625rem'],
@@ -130,6 +227,11 @@ const SHADCN_DARK_THEME_VARIABLES: ReadonlyArray<readonly [string, string]> = [
   ['sidebar-ring', 'oklch(0.553 0.013 58.071)'],
 ]
 
+const LIGHT_THEME_VARIABLE_MAP = new Map(SHADCN_LIGHT_THEME_VARIABLES)
+const BUILT_IN_THEME_PAIR_DEFINITION_MAP = new Map(
+  BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => [definition.name, definition]),
+)
+
 type RgbaColor = {
   r: number
   g: number
@@ -143,9 +245,6 @@ type ParsedOklch = {
   h: number
   a: number
 }
-
-const NUMBER_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)$/
-const PERCENT_TOKEN_PATTERN = /^[+-]?(?:\d+\.?\d*|\.\d+)%$/
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -257,13 +356,9 @@ function parseOklchColor(value: string): ParsedOklch | null {
     return null
   }
 
-  const lightnessToken = channels[0]
-  const chromaToken = channels[1]
-  const hueToken = channels[2]
-
-  const lightness = parseNumericToken(lightnessToken, { allowPercent: true })
-  const chroma = parseNumericToken(chromaToken, { allowPercent: false })
-  const hue = parseNumericToken(hueToken, { allowPercent: false })
+  const lightness = parseNumericToken(channels[0], { allowPercent: true })
+  const chroma = parseNumericToken(channels[1], { allowPercent: false })
+  const hue = parseNumericToken(channels[2], { allowPercent: false })
   if (
     lightness === null ||
     chroma === null ||
@@ -394,7 +489,8 @@ function hexToOklch(value: string): string | null {
     0.0259040371 * lPrime + 0.7827717662 * mPrime - 0.808675766 * sPrime
 
   const chroma = Math.sqrt(a * a + b * b)
-  const hue = chroma <= 1e-7 ? 0 : normalizeHue((Math.atan2(b, a) * 180) / Math.PI)
+  const hue =
+    chroma <= 1e-7 ? 0 : normalizeHue((Math.atan2(b, a) * 180) / Math.PI)
 
   return formatOklch({
     l: clamp(lightness, 0, 1),
@@ -402,6 +498,68 @@ function hexToOklch(value: string): string | null {
     h: hue,
     a: parsed.a,
   })
+}
+
+function startCase(value: string): string {
+  return value
+    .split('-')
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function getBuiltInThemePairDefinition(
+  pairName: string,
+): BuiltInThemePairDefinition | undefined {
+  return BUILT_IN_THEME_PAIR_DEFINITION_MAP.get(pairName)
+}
+
+function getBuiltInThemePairDefaults(
+  definition: BuiltInThemePairDefinition,
+): Pick<ThemeColorPair, 'color' | 'foreground'> {
+  return {
+    color: LIGHT_THEME_VARIABLE_MAP.get(definition.colorToken) ?? '#111827',
+    foreground:
+      LIGHT_THEME_VARIABLE_MAP.get(definition.foregroundToken) ?? '#f9fafb',
+  }
+}
+
+function createDefaultColorPairs(): ThemeColorPair[] {
+  return BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => {
+    const defaults = getBuiltInThemePairDefaults(definition)
+    return {
+      name: definition.name,
+      label: definition.label,
+      color: defaults.color,
+      foreground: defaults.foreground,
+      includeInButtonVariant: false,
+      isCustom: false,
+    }
+  })
+}
+
+export const DEFAULT_MAIN_THEME: MainTheme = {
+  colorPairs: createDefaultColorPairs(),
+}
+
+const DEFAULT_THEME_PAIR_BY_NAME = new Map(
+  DEFAULT_MAIN_THEME.colorPairs.map((pair) => [pair.name, pair]),
+)
+
+export function normalizeThemePairName(value: string): string | null {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  if (!PAIR_NAME_PATTERN.test(normalized)) {
+    return null
+  }
+
+  return normalized
 }
 
 export function normalizeThemeColor(value: unknown): ThemeColor | null {
@@ -429,6 +587,10 @@ export function toOklchColor(value: ThemeColor): string | null {
   return normalizeOklchColor(value) ?? hexToOklch(value)
 }
 
+function ensureThemeColor(value: unknown, fallback: ThemeColor): ThemeColor {
+  return normalizeThemeColor(value) ?? fallback
+}
+
 function formatColorForExport(
   value: ThemeColor,
   colorFormat: CssExportColorFormat,
@@ -439,29 +601,164 @@ function formatColorForExport(
   return toOklchColor(value) ?? value
 }
 
-function formatMainThemeForExport(
-  theme: MainTheme,
-  colorFormat: CssExportColorFormat,
-): MainTheme {
+function ensureThemeColorPair(
+  value: unknown,
+  fallback: ThemeColorPair,
+): ThemeColorPair | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const name = normalizeThemePairName(typeof value.name === 'string' ? value.name : '')
+  if (!name) {
+    return null
+  }
+
+  const builtInDefinition = getBuiltInThemePairDefinition(name)
+  const label =
+    typeof value.label === 'string' && value.label.trim().length > 0
+      ? value.label.trim()
+      : builtInDefinition?.label ?? startCase(name)
+
   return {
-    background: formatColorForExport(theme.background, colorFormat),
-    foreground: formatColorForExport(theme.foreground, colorFormat),
-    primary: formatColorForExport(theme.primary, colorFormat),
-    primaryForeground: formatColorForExport(theme.primaryForeground, colorFormat),
+    name,
+    label,
+    color: ensureThemeColor(value.color, fallback.color),
+    foreground: ensureThemeColor(value.foreground, fallback.foreground),
+    includeInButtonVariant:
+      !builtInDefinition && Boolean(value.includeInButtonVariant),
+    isCustom: !builtInDefinition,
   }
 }
 
-function ensureThemeColor(value: unknown, fallback: ThemeColor): ThemeColor {
-  return normalizeThemeColor(value) ?? fallback
+function mergeColorPairsWithDefaults(pairs: ThemeColorPair[]): ThemeColorPair[] {
+  const builtInOverrides = new Map<string, ThemeColorPair>()
+  const customPairs: ThemeColorPair[] = []
+  const seenCustom = new Set<string>()
+
+  for (const pair of pairs) {
+    if (BUILT_IN_THEME_PAIR_NAMES.has(pair.name)) {
+      builtInOverrides.set(pair.name, {
+        ...pair,
+        includeInButtonVariant: false,
+        isCustom: false,
+      })
+      continue
+    }
+
+    if (seenCustom.has(pair.name)) {
+      continue
+    }
+
+    seenCustom.add(pair.name)
+    customPairs.push({
+      ...pair,
+      label: pair.label.trim().length > 0 ? pair.label : startCase(pair.name),
+      includeInButtonVariant: Boolean(pair.includeInButtonVariant),
+      isCustom: true,
+    })
+  }
+
+  const builtInPairs = BUILT_IN_THEME_PAIR_DEFINITIONS.map((definition) => {
+    const override = builtInOverrides.get(definition.name)
+    const fallback = DEFAULT_THEME_PAIR_BY_NAME.get(definition.name)
+    if (override) {
+      return {
+        ...override,
+        label: definition.label,
+        includeInButtonVariant: false,
+        isCustom: false,
+      }
+    }
+
+    if (fallback) {
+      return { ...fallback }
+    }
+
+    const defaults = getBuiltInThemePairDefaults(definition)
+    return {
+      name: definition.name,
+      label: definition.label,
+      color: defaults.color,
+      foreground: defaults.foreground,
+      includeInButtonVariant: false,
+      isCustom: false,
+    }
+  })
+
+  return [...builtInPairs, ...customPairs]
+}
+
+function getThemePairTokenNames(pair: ThemeColorPair): {
+  colorToken: string
+  foregroundToken: string
+} {
+  const builtInDefinition = getBuiltInThemePairDefinition(pair.name)
+  if (builtInDefinition) {
+    return {
+      colorToken: builtInDefinition.colorToken,
+      foregroundToken: builtInDefinition.foregroundToken,
+    }
+  }
+
+  return {
+    colorToken: pair.name,
+    foregroundToken: `${pair.name}-foreground`,
+  }
+}
+
+function getLightThemeVariablesWithOverrides(
+  theme: MainTheme,
+): ReadonlyArray<readonly [string, string]> {
+  const variables = new Map<string, string>(SHADCN_LIGHT_THEME_VARIABLES)
+
+  for (const pair of theme.colorPairs) {
+    const tokenNames = getThemePairTokenNames(pair)
+    variables.set(tokenNames.colorToken, pair.color)
+    variables.set(tokenNames.foregroundToken, pair.foreground)
+  }
+
+  const orderedBaseVariables = SHADCN_LIGHT_THEME_VARIABLES.map(([name]) => [
+    name,
+    variables.get(name) ?? '',
+  ])
+
+  const customVariables = getCustomThemeColorPairs(theme).flatMap((pair) => {
+    const tokenNames = getThemePairTokenNames(pair)
+    return [
+      [tokenNames.colorToken, variables.get(tokenNames.colorToken) ?? pair.color],
+      [
+        tokenNames.foregroundToken,
+        variables.get(tokenNames.foregroundToken) ?? pair.foreground,
+      ],
+    ]
+  })
+
+  return [...orderedBaseVariables, ...customVariables]
+}
+
+function getDarkThemeVariablesWithCustomPairs(
+  theme: MainTheme,
+): ReadonlyArray<readonly [string, string]> {
+  const customVariables = getCustomThemeColorPairs(theme).flatMap((pair) => {
+    const tokenNames = getThemePairTokenNames(pair)
+    return [
+      [tokenNames.colorToken, pair.color],
+      [tokenNames.foregroundToken, pair.foreground],
+    ]
+  })
+
+  return [...SHADCN_DARK_THEME_VARIABLES, ...customVariables]
 }
 
 function mapThemeVariablesForExport(
   variables: ReadonlyArray<readonly [string, string]>,
   colorFormat: CssExportColorFormat,
 ): ReadonlyArray<readonly [string, string]> {
-  return variables.map(([name, value]) => {
-    return [name, formatColorForExport(value, colorFormat)]
-  })
+  return variables.map(([name, value]) => [
+    name,
+    formatColorForExport(value, colorFormat),
+  ])
 }
 
 function formatCssVariableBlock(
@@ -472,69 +769,126 @@ function formatCssVariableBlock(
   return `${selector} {\n${lines.join('\n')}\n}`
 }
 
-function getLightThemeVariablesWithOverrides(
-  theme: MainTheme,
-): ReadonlyArray<readonly [string, string]> {
-  const overrides = new Map<string, string>([
-    ['background', theme.background],
-    ['foreground', theme.foreground],
-    ['primary', theme.primary],
-    ['primary-foreground', theme.primaryForeground],
+function formatThemeInlineBlock(theme: MainTheme): string {
+  const customPairLines = getCustomThemeColorPairs(theme).flatMap((pair) => [
+    `  --color-${pair.name}: var(--${pair.name});`,
+    `  --color-${pair.name}-foreground: var(--${pair.name}-foreground);`,
   ])
 
-  return SHADCN_LIGHT_THEME_VARIABLES.map(([name, value]) => [
-    name,
-    overrides.get(name) ?? value,
-  ])
+  return `@theme inline {\n${[
+    ...SHADCN_THEME_INLINE_BASE_LINES,
+    ...customPairLines,
+  ].join('\n')}\n}`
+}
+
+function normalizeMainTheme(value: unknown): MainTheme | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (Array.isArray(value.colorPairs)) {
+    const parsedPairs: ThemeColorPair[] = []
+
+    for (const pairCandidate of value.colorPairs) {
+      if (!isRecord(pairCandidate)) {
+        continue
+      }
+
+      const name = normalizeThemePairName(
+        typeof pairCandidate.name === 'string' ? pairCandidate.name : '',
+      )
+      if (!name) {
+        continue
+      }
+
+      const fallbackPair =
+        DEFAULT_THEME_PAIR_BY_NAME.get(name) ?? {
+          name,
+          label: startCase(name),
+          color: '#111827',
+          foreground: '#f9fafb',
+          includeInButtonVariant: false,
+          isCustom: true,
+        }
+
+      const pair = ensureThemeColorPair(pairCandidate, fallbackPair)
+      if (pair) {
+        parsedPairs.push(pair)
+      }
+    }
+
+    return {
+      colorPairs: mergeColorPairsWithDefaults(parsedPairs),
+    }
+  }
+
+  const hasLegacyShape =
+    'background' in value ||
+    'foreground' in value ||
+    'primary' in value ||
+    'primaryForeground' in value
+
+  if (!hasLegacyShape) {
+    return null
+  }
+
+  const baseTheme = { ...DEFAULT_MAIN_THEME }
+  const withBackgroundOverride = updateThemeColorPair(baseTheme, 'background', {
+    color: ensureThemeColor(value.background, getThemeColorPair(baseTheme, 'background')?.color ?? '#ffffff'),
+    foreground: ensureThemeColor(
+      value.foreground,
+      getThemeColorPair(baseTheme, 'background')?.foreground ?? '#111827',
+    ),
+  })
+
+  return updateThemeColorPair(withBackgroundOverride, 'primary', {
+    color: ensureThemeColor(
+      value.primary,
+      getThemeColorPair(baseTheme, 'primary')?.color ?? '#111827',
+    ),
+    foreground: ensureThemeColor(
+      value.primaryForeground,
+      getThemeColorPair(baseTheme, 'primary')?.foreground ?? '#f9fafb',
+    ),
+  })
 }
 
 export function isMainTheme(value: unknown): value is MainTheme {
-  if (!isRecord(value)) {
+  if (!isRecord(value) || !Array.isArray(value.colorPairs)) {
     return false
   }
 
-  return (
-    isThemeColor(value.background) &&
-    isThemeColor(value.foreground) &&
-    isThemeColor(value.primary) &&
-    isThemeColor(value.primaryForeground)
-  )
+  const seen = new Set<string>()
+  for (const pair of value.colorPairs) {
+    if (!isRecord(pair)) {
+      return false
+    }
+
+    const name = normalizeThemePairName(typeof pair.name === 'string' ? pair.name : '')
+    if (!name || seen.has(name)) {
+      return false
+    }
+
+    seen.add(name)
+
+    if (
+      !isThemeColor(pair.color) ||
+      !isThemeColor(pair.foreground) ||
+      typeof pair.label !== 'string'
+    ) {
+      return false
+    }
+  }
+
+  return true
 }
 
 export function parseMainTheme(raw: string): MainTheme | null {
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (!isMainTheme(parsed)) {
-      return null
-    }
-
-    return {
-      background: ensureThemeColor(parsed.background, DEFAULT_MAIN_THEME.background),
-      foreground: ensureThemeColor(parsed.foreground, DEFAULT_MAIN_THEME.foreground),
-      primary: ensureThemeColor(parsed.primary, DEFAULT_MAIN_THEME.primary),
-      primaryForeground: ensureThemeColor(
-        parsed.primaryForeground,
-        DEFAULT_MAIN_THEME.primaryForeground,
-      ),
-    }
+    return normalizeMainTheme(parsed)
   } catch {
     return null
-  }
-}
-
-function normalizeTheme(value: unknown): MainTheme | null {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  return {
-    background: ensureThemeColor(value.background, DEFAULT_MAIN_THEME.background),
-    foreground: ensureThemeColor(value.foreground, DEFAULT_MAIN_THEME.foreground),
-    primary: ensureThemeColor(value.primary, DEFAULT_MAIN_THEME.primary),
-    primaryForeground: ensureThemeColor(
-      value.primaryForeground,
-      DEFAULT_MAIN_THEME.primaryForeground,
-    ),
   }
 }
 
@@ -549,16 +903,7 @@ export function loadMainTheme(): MainTheme {
   }
 
   const parsed = parseMainTheme(raw)
-  if (parsed) {
-    return parsed
-  }
-  try {
-    const unsafeParsed: unknown = JSON.parse(raw)
-    const normalized = normalizeTheme(unsafeParsed)
-    return normalized ?? { ...DEFAULT_MAIN_THEME }
-  } catch {
-    return { ...DEFAULT_MAIN_THEME }
-  }
+  return parsed ?? { ...DEFAULT_MAIN_THEME }
 }
 
 export function saveMainTheme(theme: MainTheme) {
@@ -567,6 +912,121 @@ export function saveMainTheme(theme: MainTheme) {
   }
 
   window.localStorage.setItem(MAIN_THEME_STORAGE_KEY, JSON.stringify(theme))
+}
+
+export function getThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
+  return [...theme.colorPairs]
+}
+
+export function getBuiltInThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
+  return theme.colorPairs.filter((pair) => !pair.isCustom)
+}
+
+export function getCustomThemeColorPairs(theme: MainTheme): ThemeColorPair[] {
+  return theme.colorPairs.filter((pair) => pair.isCustom)
+}
+
+export function getThemeColorPair(
+  theme: MainTheme,
+  pairName: string,
+): ThemeColorPair | null {
+  const normalizedName = normalizeThemePairName(pairName)
+  if (!normalizedName) {
+    return null
+  }
+
+  const pair = theme.colorPairs.find((candidate) => candidate.name === normalizedName)
+  if (pair) {
+    return pair
+  }
+
+  return DEFAULT_THEME_PAIR_BY_NAME.get(normalizedName) ?? null
+}
+
+export function updateThemeColorPair(
+  theme: MainTheme,
+  pairName: string,
+  updates: Partial<
+    Pick<ThemeColorPair, 'label' | 'color' | 'foreground' | 'includeInButtonVariant'>
+  >,
+): MainTheme {
+  const normalizedName = normalizeThemePairName(pairName)
+  if (!normalizedName) {
+    return theme
+  }
+
+  const nextPairs = theme.colorPairs.map((pair) => {
+    if (pair.name !== normalizedName) {
+      return pair
+    }
+
+    const nextLabel =
+      typeof updates.label === 'string' && updates.label.trim().length > 0
+        ? updates.label.trim()
+        : pair.label
+
+    return {
+      ...pair,
+      label: pair.isCustom ? nextLabel : pair.label,
+      color: ensureThemeColor(updates.color, pair.color),
+      foreground: ensureThemeColor(updates.foreground, pair.foreground),
+      includeInButtonVariant: pair.isCustom
+        ? Boolean(updates.includeInButtonVariant ?? pair.includeInButtonVariant)
+        : false,
+    }
+  })
+
+  return {
+    colorPairs: mergeColorPairsWithDefaults(nextPairs),
+  }
+}
+
+export function addCustomThemeColorPair(
+  theme: MainTheme,
+  input: AddThemeColorPairInput,
+): AddThemeColorPairResult {
+  const normalizedName = normalizeThemePairName(input.name)
+  if (!normalizedName) {
+    return { theme, error: 'Name must start with a letter and use only a-z, 0-9, or -.' }
+  }
+
+  if (BUILT_IN_THEME_PAIR_NAMES.has(normalizedName)) {
+    return { theme, error: 'This semantic pair already exists.' }
+  }
+
+  if (RESERVED_BUTTON_VARIANT_NAMES.has(normalizedName)) {
+    return {
+      theme,
+      error: 'This name conflicts with an existing button variant.',
+    }
+  }
+
+  if (theme.colorPairs.some((pair) => pair.name === normalizedName)) {
+    return { theme, error: 'A pair with this name already exists.' }
+  }
+
+  const primaryPair = getThemeColorPair(theme, 'primary')
+  const nextPair: ThemeColorPair = {
+    name: normalizedName,
+    label:
+      typeof input.label === 'string' && input.label.trim().length > 0
+        ? input.label.trim()
+        : startCase(normalizedName),
+    color: ensureThemeColor(input.color, primaryPair?.color ?? '#111827'),
+    foreground: ensureThemeColor(
+      input.foreground,
+      primaryPair?.foreground ?? '#f9fafb',
+    ),
+    includeInButtonVariant: Boolean(input.includeInButtonVariant),
+    isCustom: true,
+  }
+
+  return {
+    theme: {
+      colorPairs: [...theme.colorPairs, nextPair],
+    },
+    error: null,
+  }
 }
 
 export function getMainThemeCss(
@@ -578,18 +1038,28 @@ export function getMainThemeCss(
     colorFormat,
   )
   const darkTheme = mapThemeVariablesForExport(
-    SHADCN_DARK_THEME_VARIABLES,
+    getDarkThemeVariablesWithCustomPairs(theme),
     colorFormat,
   )
 
   return [
-    SHADCN_THEME_INLINE,
+    formatThemeInlineBlock(theme),
     formatCssVariableBlock(':root', lightTheme),
     formatCssVariableBlock('.dark', darkTheme),
   ].join('\n\n')
 }
 
-export function getMainThemeComponentTsx(): string {
+export function getMainThemeComponentTsx(theme: MainTheme): string {
+  const customVariantLines = getCustomThemeColorPairs(theme)
+    .filter((pair) => pair.includeInButtonVariant)
+    .map(
+      (pair) =>
+        `        '${pair.name}': 'bg-${pair.name} text-${pair.name}-foreground hover:bg-${pair.name}/90',`,
+    )
+
+  const customVariantBlock =
+    customVariantLines.length > 0 ? `\n${customVariantLines.join('\n')}` : ''
+
   return `import * as React from 'react'
 import { cva } from 'class-variance-authority'
 import type { VariantProps } from 'class-variance-authority'
@@ -611,7 +1081,7 @@ const buttonVariants = cva(
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-primary underline-offset-4 hover:underline',${customVariantBlock}
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
