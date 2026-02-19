@@ -18,7 +18,6 @@ import type {
   AppAppearance,
   CssExportColorFormat,
   MainTheme,
-  ThemeMode,
 } from '@/features/theme-builder/model/theme'
 import { ExportComponentDialog } from '@/features/theme-builder/ui/export-component-dialog'
 import { ExportCssDialog } from '@/features/theme-builder/ui/export-css-dialog'
@@ -64,9 +63,6 @@ export function ThemeBuilderScreen() {
   const [appAppearance, setAppAppearance] = React.useState<AppAppearance>(() =>
     loadAppAppearance(),
   )
-  const [designerEditMode, setDesignerEditMode] = React.useState<ThemeMode>(
-    () => loadAppAppearance(),
-  )
   const [exportColorFormat, setExportColorFormat] =
     React.useState<CssExportColorFormat>('oklch')
 
@@ -95,7 +91,7 @@ export function ThemeBuilderScreen() {
         onAppAppearanceChange={setAppAppearance}
       />
       <SidebarInset className="min-h-0 overflow-hidden">
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/75 sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b px-3 backdrop-blur md:px-4">
+        <header className="bg-accent sticky top-0 z-20 flex min-h-14 flex-wrap items-center gap-2 border-b px-3 backdrop-blur md:px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-4" />
           <div className="min-w-0 flex-1">
@@ -123,10 +119,6 @@ export function ThemeBuilderScreen() {
             <div className="min-h-0 overflow-y-auto overscroll-none border-r">
               <ThemeDesignerPanel
                 theme={theme}
-                mode={designerEditMode}
-                appAppearance={appAppearance}
-                onModeChange={setDesignerEditMode}
-                onAppAppearanceChange={setAppAppearance}
                 onThemeChange={(updater) =>
                   setTheme((previous) => updater(previous))
                 }

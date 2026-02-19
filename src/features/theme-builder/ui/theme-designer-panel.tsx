@@ -1,5 +1,11 @@
 import * as React from 'react'
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -10,7 +16,6 @@ import {
   updateThemeColorPair,
 } from '@/features/theme-builder/model/theme'
 import type {
-  AppAppearance,
   MainTheme,
   ThemeColorPair,
   ThemeMode,
@@ -19,18 +24,44 @@ import { ColorField } from '@/features/theme-builder/ui/color-field'
 
 interface ThemeDesignerPanelProps {
   theme: MainTheme
-  mode: ThemeMode
-  appAppearance: AppAppearance
-  onModeChange: (mode: ThemeMode) => void
-  onAppAppearanceChange: (appAppearance: AppAppearance) => void
   onThemeChange: (updater: (previous: MainTheme) => MainTheme) => void
 }
 
+interface CombinedThemeColorPair {
+  light: ThemeColorPair
+  dark: ThemeColorPair
+}
+
 interface ColorPairEditorProps {
-  pair: ThemeColorPair
-  onColorChange: (value: string) => void
-  onForegroundChange: (value: string) => void
+  pair: CombinedThemeColorPair
+  onColorChange: (mode: ThemeMode, value: string) => void
+  onForegroundChange: (mode: ThemeMode, value: string) => void
   onIncludeInButtonVariantChange?: (value: boolean) => void
+}
+
+function combineThemeColorPairs(
+  lightPairs: ThemeColorPair[],
+  darkPairs: ThemeColorPair[],
+): CombinedThemeColorPair[] {
+  const lightByName = new Map(lightPairs.map((pair) => [pair.name, pair]))
+  const darkByName = new Map(darkPairs.map((pair) => [pair.name, pair]))
+
+  const orderedNames = [
+    ...lightPairs.map((pair) => pair.name),
+    ...darkPairs
+      .map((pair) => pair.name)
+      .filter((name) => !lightByName.has(name)),
+  ]
+
+  return orderedNames.flatMap((name) => {
+    const lightPair = lightByName.get(name)
+    const darkPair = darkByName.get(name)
+    if (!lightPair || !darkPair) {
+      return []
+    }
+
+    return [{ light: lightPair, dark: darkPair }]
+  })
 }
 
 function ColorPairEditor({
@@ -40,49 +71,62 @@ function ColorPairEditor({
   onIncludeInButtonVariantChange,
 }: ColorPairEditorProps) {
   return (
-    <div className="rounded-md border p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{pair.label}</p>
-          <p className="text-muted-foreground truncate text-xs font-mono">
-            {pair.name}
-          </p>
+    <AccordionItem value={pair.light.name}>
+      <AccordionTrigger className="py-3 px-2 hover:no-underline">
+        <p className="truncate text-base font-semibold">{pair.light.label}</p>
+      </AccordionTrigger>
+      <AccordionContent className="space-y-3 p-2">
+        <div className="grid gap-3 xl:grid-cols-2">
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm font-semibold">Light</p>
+            <ColorField
+              label={pair.light.name}
+              value={pair.light.color}
+              pickerFallbackHex="#111827"
+              onChange={(value) => onColorChange('light', value)}
+            />
+            <ColorField
+              label={`${pair.light.name}-foreground`}
+              value={pair.light.foreground}
+              pickerFallbackHex="#f9fafb"
+              onChange={(value) => onForegroundChange('light', value)}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-muted-foreground text-sm font-semibold">Dark</p>
+            <ColorField
+              label={pair.dark.name}
+              value={pair.dark.color}
+              pickerFallbackHex="#111827"
+              onChange={(value) => onColorChange('dark', value)}
+            />
+            <ColorField
+              label={`${pair.dark.name}-foreground`}
+              value={pair.dark.foreground}
+              pickerFallbackHex="#f9fafb"
+              onChange={(value) => onForegroundChange('dark', value)}
+            />
+          </div>
         </div>
+
         {onIncludeInButtonVariantChange ? (
           <label className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">cva variant</span>
+            <span className="text-muted-foreground">Add to button cva</span>
             <Switch
-              checked={pair.includeInButtonVariant}
+              checked={pair.light.includeInButtonVariant}
               onCheckedChange={onIncludeInButtonVariantChange}
-              aria-label={`Include ${pair.name} as button variant`}
+              aria-label={`Include ${pair.light.name} as button variant`}
             />
           </label>
         ) : null}
-      </div>
-      <div className="flex flex-col gap-2">
-        <ColorField
-          label={pair.name}
-          value={pair.color}
-          pickerFallbackHex="#111827"
-          onChange={onColorChange}
-        />
-        <ColorField
-          label={`${pair.name}-foreground`}
-          value={pair.foreground}
-          pickerFallbackHex="#f9fafb"
-          onChange={onForegroundChange}
-        />
-      </div>
-    </div>
+      </AccordionContent>
+    </AccordionItem>
   )
 }
 
 export function ThemeDesignerPanel({
   theme,
-  mode,
-  appAppearance,
-  onModeChange,
-  onAppAppearanceChange,
   onThemeChange,
 }: ThemeDesignerPanelProps) {
   const [newPairName, setNewPairName] = React.useState('')
@@ -91,12 +135,20 @@ export function ThemeDesignerPanel({
   const [addPairError, setAddPairError] = React.useState<string | null>(null)
 
   const builtInPairs = React.useMemo(
-    () => getBuiltInThemeColorPairs(theme, mode),
-    [mode, theme],
+    () =>
+      combineThemeColorPairs(
+        getBuiltInThemeColorPairs(theme, 'light'),
+        getBuiltInThemeColorPairs(theme, 'dark'),
+      ),
+    [theme],
   )
   const customPairs = React.useMemo(
-    () => getCustomThemeColorPairs(theme, mode),
-    [mode, theme],
+    () =>
+      combineThemeColorPairs(
+        getCustomThemeColorPairs(theme, 'light'),
+        getCustomThemeColorPairs(theme, 'dark'),
+      ),
+    [theme],
   )
 
   const handleAddPair = React.useCallback(() => {
@@ -117,148 +169,118 @@ export function ThemeDesignerPanel({
   }, [includeInButtonVariant, newPairName, onThemeChange, theme])
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">Theme Designer</h2>
-          <label className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Dark mode</span>
-            <Switch
-              checked={appAppearance === 'dark'}
-              onCheckedChange={(checked) =>
-                onAppAppearanceChange(checked ? 'dark' : 'light')
+    <div className="space-y-6">
+      <div className="p-2">
+        <h2 className="text-base font-semibold">Theme Designer</h2>
+        <p className="text-muted-foreground text-xs">
+          Light and dark tokens are editable together.
+        </p>
+      </div>
+
+      <section className="space-y-2">
+        <Accordion
+          type="multiple"
+          defaultValue={builtInPairs.map((pair) => pair.light.name)}
+        >
+          {builtInPairs.map((pair) => (
+            <ColorPairEditor
+              key={pair.light.name}
+              pair={pair}
+              onColorChange={(mode, value) =>
+                onThemeChange((previous) =>
+                  updateThemeColorPair(previous, mode, pair.light.name, {
+                    color: value,
+                  }),
+                )
               }
-              aria-label="Toggle app dark mode"
+              onForegroundChange={(mode, value) =>
+                onThemeChange((previous) =>
+                  updateThemeColorPair(previous, mode, pair.light.name, {
+                    foreground: value,
+                  }),
+                )
+              }
+            />
+          ))}
+        </Accordion>
+      </section>
+
+      <section className="space-y-2 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold">Custom Color Pairs</p>
+          <span className="text-muted-foreground text-xs">
+            {customPairs.length} pair{customPairs.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="space-y-1">
+            <label className="text-xs" htmlFor="new-color-pair-name">
+              Pair Name
+            </label>
+            <Input
+              id="new-color-pair-name"
+              value={newPairName}
+              onChange={(event) => setNewPairName(event.target.value)}
+              placeholder="brand"
+              className="font-mono text-xs"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Add to button cva</span>
+            <Switch
+              checked={includeInButtonVariant}
+              onCheckedChange={setIncludeInButtonVariant}
             />
           </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs">Editing tokens</span>
-          <div className="inline-flex items-center gap-1 rounded-md border p-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === 'light' ? 'secondary' : 'ghost'}
-              onClick={() => onModeChange('light')}
-            >
-              Light
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === 'dark' ? 'secondary' : 'ghost'}
-              onClick={() => onModeChange('dark')}
-            >
-              Dark
+
+          {addPairError ? (
+            <p className="text-destructive text-xs">{addPairError}</p>
+          ) : null}
+
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleAddPair}>
+              Add Color Pair
             </Button>
           </div>
         </div>
-      </div>
-      <div className="space-y-4">
-        <section className="space-y-2">
-          <p className="text-sm font-medium">Semantic Color Pairs</p>
-          <p className="text-muted-foreground text-xs">
-            Every token is grouped as <code>{'{color}'}</code> +{' '}
-            <code>{'{color}-foreground'}</code>.
-          </p>
 
-          <div className="space-y-2">
-            {builtInPairs.map((pair) => (
+        {customPairs.length > 0 ? (
+          <Accordion
+            type="multiple"
+            defaultValue={customPairs.map((pair) => pair.light.name)}
+          >
+            {customPairs.map((pair) => (
               <ColorPairEditor
-                key={pair.name}
+                key={pair.light.name}
                 pair={pair}
-                onColorChange={(value) =>
+                onColorChange={(mode, value) =>
                   onThemeChange((previous) =>
-                    updateThemeColorPair(previous, mode, pair.name, { color: value }),
+                    updateThemeColorPair(previous, mode, pair.light.name, {
+                      color: value,
+                    }),
                   )
                 }
-                onForegroundChange={(value) =>
+                onForegroundChange={(mode, value) =>
                   onThemeChange((previous) =>
-                    updateThemeColorPair(previous, mode, pair.name, {
+                    updateThemeColorPair(previous, mode, pair.light.name, {
                       foreground: value,
+                    }),
+                  )
+                }
+                onIncludeInButtonVariantChange={(checked) =>
+                  onThemeChange((previous) =>
+                    updateThemeColorPair(previous, 'light', pair.light.name, {
+                      includeInButtonVariant: checked,
                     }),
                   )
                 }
               />
             ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">Custom Color Pairs</p>
-            <span className="text-muted-foreground text-xs">
-              {customPairs.length} pair{customPairs.length === 1 ? '' : 's'}
-            </span>
-          </div>
-
-          <div className="rounded-md border p-3">
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div className="space-y-1">
-                <label className="text-xs" htmlFor="new-color-pair-name">
-                  Pair Name
-                </label>
-                <Input
-                  id="new-color-pair-name"
-                  value={newPairName}
-                  onChange={(event) => setNewPairName(event.target.value)}
-                  placeholder="brand"
-                  className="font-mono text-xs"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">Add to button cva</span>
-                <Switch
-                  checked={includeInButtonVariant}
-                  onCheckedChange={setIncludeInButtonVariant}
-                />
-              </label>
-            </div>
-
-            {addPairError ? (
-              <p className="text-destructive mt-2 text-xs">{addPairError}</p>
-            ) : null}
-
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" onClick={handleAddPair}>
-                Add Color Pair
-              </Button>
-            </div>
-          </div>
-
-          {customPairs.length > 0 ? (
-            <div className="space-y-2">
-              {customPairs.map((pair) => (
-                <ColorPairEditor
-                  key={pair.name}
-                  pair={pair}
-                  onColorChange={(value) =>
-                    onThemeChange((previous) =>
-                      updateThemeColorPair(previous, mode, pair.name, {
-                        color: value,
-                      }),
-                    )
-                  }
-                  onForegroundChange={(value) =>
-                    onThemeChange((previous) =>
-                      updateThemeColorPair(previous, mode, pair.name, {
-                        foreground: value,
-                      }),
-                    )
-                  }
-                  onIncludeInButtonVariantChange={(checked) =>
-                    onThemeChange((previous) =>
-                      updateThemeColorPair(previous, mode, pair.name, {
-                        includeInButtonVariant: checked,
-                      }),
-                    )
-                  }
-                />
-              ))}
-            </div>
-          ) : null}
-        </section>
-      </div>
+          </Accordion>
+        ) : null}
+      </section>
     </div>
   )
 }

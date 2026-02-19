@@ -30,7 +30,7 @@ export function ThemeBuilderSidebar({
   return (
     <Sidebar variant="inset" collapsible="icon">
       <SidebarHeader>
-        <div className="bg-sidebar-accent/60 flex items-center justify-between rounded-md px-2 py-1.5">
+        <div className="flex items-center justify-between px-2 py-1.5">
           <div className="flex min-w-0 items-center gap-2">
             <div className="bg-sidebar-primary text-sidebar-primary-foreground grid size-6 shrink-0 place-items-center rounded-md">
               <PaletteIcon className="size-3.5" />
