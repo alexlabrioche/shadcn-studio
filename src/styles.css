@@ -61,25 +61,25 @@ code {
 
 :root {
   --radius: 0.25rem;
-  --background: var(--color-stone-100);
-  --foreground: var(--color-stone-800);
+  --background: var(--color-neutral-100);
+  --foreground: var(--color-neutral-800);
   --card: #ffffff;
-  --card-foreground: var(--color-stone-800);
+  --card-foreground: var(--color-neutral-800);
   --popover: #ffffff;
-  --popover-foreground: var(--color-stone-800);
+  --popover-foreground: var(--color-neutral-800);
   --primary: #1e40af;
   --primary-foreground: #ffffff;
   --secondary: #64748b;
   --secondary-foreground: #ffffff;
   --muted: #f3f4f6;
   --muted-foreground: #555555;
-  --accent: var(--color-stone-100);
+  --accent: var(--color-neutral-100);
   --accent-foreground: #555555;
   --destructive: #ff0000;
-  --border: var(--color-stone-200);
+  --border: var(--color-neutral-200);
   --input: #e5e7eb;
   --ring: #d1d5db;
-  --sidebar: var(--color-stone-200);
+  --sidebar: var(--color-neutral-200);
   --sidebar-foreground: #1c1c1c;
   --sidebar-primary: #363636;
   --sidebar-primary-foreground: #ffffff;
