@@ -1,5 +1,5 @@
 {
-  "name": "giga-shad",
+  "name": "shadcn-studio",
   "private": true,
   "type": "module",
   "imports": {
@@ -7,12 +7,20 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "build": "vite build && bun run build:studio",
+    "build:studio": "mkdir -p dist/studio && bun build ./src/cli/cli.ts --target=node --outfile ./dist/studio/cli.js",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier --check .",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "studio:init": "bun run src/cli/cli.ts init",
+    "studio:dev": "bun run src/cli/cli.ts dev",
+    "studio:diff": "bun run src/cli/cli.ts diff",
+    "studio:apply": "bun run src/cli/cli.ts apply"
+  },
+  "bin": {
+    "shadcn-studio": "./bin/shadcn-studio.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

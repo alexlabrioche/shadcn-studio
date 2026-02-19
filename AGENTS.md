@@ -14,10 +14,14 @@ This document is the operational source of truth for contributors and coding age
 | Path                | Responsibility                                                           |
 | ------------------- | ------------------------------------------------------------------------ |
 | `src/routes`        | File-based route definitions and mode entry points.                      |
-| `src/pages`         | Page-level UI composed by routes.                                        |
-| `src/components/ui` | Shadcn-based UI primitives and variants used across the app.             |
+| `src/web`           | Studio web app domain UI (`ui`) and web-only model modules (`model`).   |
+| `src/web/ui/primitives` | App-only primitive components used by the studio web UI.            |
+| `src/components/ui` | Reserved output target for generated end-user component libraries.       |
+| `src/cli`           | Node CLI/runtime logic (`init`, `dev`, `diff`, `apply`) for Studio.     |
+| `src/shared`        | Runtime-agnostic shared model/utilities used by web and CLI.             |
 | `src/lib`           | Shared utility modules (for example `cn` and shared helpers).            |
-| `src/styles.css`    | Tailwind imports, theme tokens, and global style variables.              |
+| `src/web/styles.css` | Web app runtime styles (Tailwind imports, tokens, global app styles).   |
+| `src/styles.css`    | Reserved output target for generated end-user theme stylesheet.          |
 | `PLAN.md`           | Product and implementation plan, scope, phases, and acceptance criteria. |
 
 ## Runbook Commands
@@ -52,9 +56,9 @@ bun run build
 
 ## UI Component Policy
 
-- `src/components/ui/*` is editable baseline project code, not frozen vendor code.
-- Treat component edits as first-class product work: maintain variant contracts, token usage, and consistency.
-- When changing shared primitives, validate downstream usage and route/page rendering impact.
+- `src/web/ui/primitives/*` is app-facing primitive code for the studio web app.
+- `src/components/ui/*` is treated as generated/output surface for end-user component library experiments.
+- Keep app primitives and generated library outputs decoupled: web app code must not import from `src/components/ui/*`.
 
 ## Safety Rules (Agents and Humans)
 

@@ -15,6 +15,39 @@ export default [
     },
   },
   {
-    ignores: ['eslint.config.js', 'prettier.config.js'],
+    files: ['src/web/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@/components/ui/*', '@/cli/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/routes/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: ['../styles.css', '@/styles.css'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/cli/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@/web/*', '@/web/ui/primitives/*'],
+        },
+      ],
+    },
+  },
+  {
+    ignores: ['eslint.config.js', 'prettier.config.js', 'bin/shadcn-studio.js'],
   },
 ]

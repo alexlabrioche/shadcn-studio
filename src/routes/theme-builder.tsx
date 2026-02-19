@@ -1,4 +1,4 @@
-import { ThemeBuilderScreen } from '@/features/theme-builder'
+import { ThemeBuilderScreen } from '@/web'
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/theme-builder')({

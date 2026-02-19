@@ -9,6 +9,63 @@ bun install
 bun --bun run dev
 ```
 
+## Shadcn Studio CLI
+
+This repo now includes a `shadcn-studio` CLI for bootstrap, local runtime, and explicit diff/apply workflows.
+
+### Initialize Studio
+
+Use any of the following:
+
+```bash
+npx shadcn-studio@latest init
+npm exec shadcn-studio@latest init
+bunx shadcn-studio@latest init
+```
+
+Local repo scripts are also available:
+
+```bash
+bun run studio:init
+bun run studio:dev
+```
+
+### Runtime + Diff/Apply
+
+```bash
+shadcn-studio dev --config shadcn-studio.config.ts
+shadcn-studio diff --theme-file .shadcn-studio/theme.pending.json
+shadcn-studio apply --theme-file .shadcn-studio/theme.pending.json
+```
+
+`apply` is explicit and confirmation-gated. No file writes happen during `diff`.
+
+### Studio Config
+
+Default file: `shadcn-studio.config.ts`
+
+```ts
+export const studioConfig = {
+  "scriptName": "studio-dev",
+  "uiPath": "src/components/ui",
+  "componentsPath": "components.json",
+  "configPath": "shadcn-studio.config.ts",
+  "stylesPath": "src/styles.css",
+  "port": 3011,
+  "conflictStrategy": "ask"
+} as const
+```
+
+Config fields:
+
+- `scriptName`: npm/bun script name created/updated by `init`
+- `uiPath`: path to the shadcn UI folder
+- `componentsPath`: path to `components.json`
+- `configPath`: path where studio config is written/read
+- `stylesPath`: CSS token target file
+- `port`: local runtime port
+- `conflictStrategy`: conflict handling in apply (`ask` | `skip` | `overwrite`)
+
 # Building For Production
 
 To build this application for production:
@@ -34,7 +91,7 @@ This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
 If you prefer not to use Tailwind CSS:
 
 1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
+2. Replace the Tailwind import in `src/web/styles.css` with your own styles
 3. Remove `tailwindcss()` from the plugins array in `vite.config.mjs`
 4. Uninstall the packages: `bun install @tailwindcss/vite tailwindcss -D`
 
